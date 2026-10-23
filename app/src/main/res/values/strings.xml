@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Overlay Translator</string>
+
+    <!-- Home screen -->
+    <string name="home_title">Overlay Translator</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="status_running">Running</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_hide_overlay">Hide overlay 3s</string>
+
+    <!-- Permission cards -->
+    <string name="perm_overlay_title">Display over other apps</string>
+    <string name="perm_overlay_granted">Granted</string>
+    <string name="perm_overlay_missing">Required — tap to grant</string>
+    <string name="perm_notifications_title">Notifications</string>
+    <string name="perm_notifications_granted">Granted</string>
+    <string name="perm_notifications_missing">Required for foreground service — tap to grant</string>
+
+    <!-- Untrusted touch setup (Android 12+) -->
+    <string name="touch_setup_title">Touch passthrough</string>
+    <string name="touch_setup_ok">Touches will pass through to the game.</string>
+    <string name="touch_setup_blocked">Android 12+ blocks touches through overlays. Enable \"Allow untrusted touches\" in Developer options.</string>
+    <string name="touch_setup_open_settings">Open Developer options</string>
+    <string name="touch_setup_copy_adb">Copy adb command</string>
+    <string name="touch_setup_adb_copied">adb command copied to clipboard</string>
+
+    <!-- Settings -->
+    <string name="settings_fps">Capture rate</string>
+    <string name="settings_opacity">Background opacity</string>
+    <string name="settings_language">Source language (text on screen)</string>
+    <string name="settings_language_applies">Language change applies when capture is restarted.</string>
+    <string name="settings_fps_value">%1$.1f fps</string>
+    <string name="settings_opacity_value">%1$d%%</string>
+    <string name="btn_clear_cache">Clear translation cache</string>
+    <string name="btn_download_model">Download translation model</string>
+    <string name="btn_glossary">Edit glossary</string>
+    <string name="cache_cleared">Cache cleared</string>
+    <string name="model_downloading">Downloading translation model (~30 MB)…</string>
+    <string name="model_ready">Translation model ready</string>
+    <string name="model_failed">Model download failed. Check network and retry.</string>
+    <string name="model_origin">The translation model (e.g. en_zh.zip) is fetched automatically by Google Play Services (ML Kit) from Google\'s servers and stored in this app\'s ML Kit module directory.\nhttps://developers.google.com/ml-kit/language/translation</string>
+
+    <string-array name="source_language_labels">
+        <item>Chinese</item>
+        <item>Japanese</item>
+        <item>Korean</item>
+        <item>French</item>
+        <item>Spanish</item>
+        <item>Vietnamese</item>
+    </string-array>
+    <string-array name="source_language_codes">
+        <item>zh</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>fr</item>
+        <item>es</item>
+        <item>vi</item>
+    </string-array>
+
+    <!-- Glossary -->
+    <string name="glossary_title">Glossary</string>
+    <string name="glossary_hint_chinese">Chinese term</string>
+    <string name="glossary_hint_english">Preferred English</string>
+    <string name="glossary_add">Add term</string>
+    <string name="glossary_empty">No terms yet. Add character names, items, and skills to keep them consistent.</string>
+    <string name="glossary_delete">Delete</string>
+    <string name="glossary_save">Save</string>
+
+    <!-- Foreground notification -->
+    <string name="notif_channel_name">Capture</string>
+    <string name="notif_channel_desc">Shows while screen translation is active</string>
+    <string name="notif_title">Translating screen</string>
+    <string name="notif_text">Tap to open Overlay Translator</string>
+    <string name="notif_stop">Stop</string>
+
+    <!-- Errors -->
+    <string name="err_projection">Screen capture permission was revoked.</string>
+    <string name="err_service_start">Could not start capture service.</string>
+</resources>
