@@ -26,6 +26,15 @@ class OverlayService(private val context: Context) {
     private var view: TranslationView? = null
     private var pokeView: View? = null
     private var pokeFlip = false
+    private var allowOverflow = false
+
+    /** Text may extend beyond the OCR box (applies to new bindings). */
+    fun setAllowOverflow(value: Boolean) {
+        mainHandler.post {
+            allowOverflow = value
+            view?.allowOverflow = value
+        }
+    }
 
     @Volatile
     private var hidden = false
@@ -57,6 +66,13 @@ class OverlayService(private val context: Context) {
         }
     }
 
+    /** Shows a status line (top-right chip). Safe to call from any thread. */
+    fun status(text: String) {
+        mainHandler.post {
+            obtainView().setStatus(text)
+        }
+    }
+
     /** Toggles the overlay invisible for [millis], then restores it. */
     fun hideTemporarily(millis: Long = 3000L) {
         mainHandler.post {
@@ -80,7 +96,7 @@ class OverlayService(private val context: Context) {
 
     private fun obtainView(): TranslationView {
         view?.let { return it }
-        val created = TranslationView(context)
+        val created = TranslationView(context).apply { allowOverflow = this@OverlayService.allowOverflow }
         view = created
         runCatching { wm.addView(created, windowParams()) }
         return created

@@ -18,41 +18,64 @@ import com.overlaytranslator.util.ColorSampler
  * Full-screen transparent view that paints every translation over its OCR
  * bounding box. All boxes are drawn in one window and one draw pass, so a
  * batch of translations appears simultaneously instead of window-by-window.
+ *
+ * Stability: OCR boxes jitter on animated screens, so a block whose text is
+ * unchanged and whose box still overlaps keeps its previous box (hysteresis),
+ * and an unchanged set of blocks skips re-rendering entirely.
  */
 class TranslationView(context: Context) : View(context) {
 
-    private val bgPaint = Paint()
-    private val textPaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.DEFAULT_BOLD
-        textAlign = Paint.Align.LEFT
-    }
-
     private class Item(
+        val text: String,
         val box: Rect,
         val background: Int,
         val backgroundAlpha: Int,
-        val textColor: Int,
-        val layout: StaticLayout?,
+        val fill: StaticLayout?,
+        val stroke: StaticLayout?,
+        val textTop: Float,
     )
 
+    private data class Key(val text: String, val box: Rect, val background: Int, val backgroundAlpha: Int)
+
     private var items: List<Item> = emptyList()
+    private var itemKeys: List<Key> = emptyList()
+
+    /** When true, text lays out against the remaining screen width instead of
+     *  the OCR box, so it wraps naturally instead of breaking mid-word. */
+    var allowOverflow: Boolean = false
+    private val bgPaint = Paint()
+    private var statusText: String = ""
+
+    private val chipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6181818.toInt() }
+    private val chipTextPaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, 11f, resources.displayMetrics
+        )
+    }
+
+    /** Status chip content, e.g. "translate 512ms · 4 blocks" or "skipped". */
+    fun setStatus(text: String) {
+        statusText = text
+        invalidate()
+    }
 
     /** Renders [blocks] at their absolute screen positions. */
     fun bind(blocks: List<RenderedBlock>, backgroundAlpha: Int) {
-        items = blocks.map { block ->
-            Item(
-                box = block.bbox,
-                background = block.backgroundColor,
-                backgroundAlpha = backgroundAlpha,
-                textColor = ColorSampler.contrastingText(block.backgroundColor),
-                layout = buildLayout(
-                    block.translatedText,
-                    block.bbox.width(),
-                    block.bbox.height(),
-                    ColorSampler.contrastingText(block.backgroundColor),
-                ),
-            )
+        val snapped = blocks.map { block ->
+            val prev = items.firstOrNull {
+                it.text == block.translatedText && overlaps(it.box, block.bbox)
+            }
+            block to (prev?.box ?: block.bbox)
         }
+
+        val keys = snapped.map { (block, box) ->
+            Key(block.translatedText, box, block.backgroundColor, backgroundAlpha)
+        }
+        if (keys == itemKeys) return
+
+        itemKeys = keys
+        items = snapped.map { (block, box) -> buildItem(block, box, backgroundAlpha) }
         invalidate()
     }
 
@@ -60,53 +83,114 @@ class TranslationView(context: Context) : View(context) {
         super.onDraw(canvas)
         for (item in items) {
             val box = item.box
-            bgPaint.color = Color.argb(
+            val bg = Color.argb(
                 item.backgroundAlpha,
                 Color.red(item.background),
                 Color.green(item.background),
                 Color.blue(item.background),
             )
-            canvas.drawRect(
-                box.left.toFloat(), box.top.toFloat(),
-                box.right.toFloat(), box.bottom.toFloat(),
-                bgPaint,
-            )
-            val layout = item.layout ?: continue
-            val textTop = box.top + ((box.height() - layout.height) / 2f).coerceAtLeast(0f)
-            canvas.save()
-            canvas.translate((box.left + PADDING).toFloat(), textTop)
-            layout.draw(canvas)
-            canvas.restore()
+            canvas.drawRect(box.left.toFloat(), box.top.toFloat(), box.right.toFloat(), box.bottom.toFloat(), bgPaint.apply { color = bg })
+            val x = (box.left + PADDING).toFloat()
+            item.stroke?.drawAt(canvas, x, item.textTop)
+            item.fill?.drawAt(canvas, x, item.textTop)
+        }
+
+        if (statusText.isNotEmpty()) {
+            val pad = 12f
+            val fm = chipTextPaint.fontMetrics
+            val chipW = chipTextPaint.measureText(statusText) + pad * 2
+            val chipH = (fm.bottom - fm.top) + pad * 2
+            val right = width - 16f
+            val top = 16f
+            canvas.drawRoundRect(right - chipW, top, right, top + chipH, 12f, 12f, chipPaint)
+            canvas.drawText(statusText, right - chipW + pad, top + pad - fm.top, chipTextPaint)
         }
     }
 
+    private fun StaticLayout.drawAt(canvas: Canvas, x: Float, y: Float) {
+        canvas.save()
+        canvas.translate(x, y)
+        draw(canvas)
+        canvas.restore()
+    }
+
+    private fun buildItem(block: RenderedBlock, box: Rect, backgroundAlpha: Int): Item {
+        val text = block.translatedText
+        val textColor = ColorSampler.contrastingText(block.backgroundColor)
+        val innerW = (box.width() - PADDING * 2).coerceAtLeast(1)
+        val innerH = (box.height() - PADDING * 2).coerceAtLeast(1)
+
+        // Overflow mode uses a fixed, readable size (not scale-to-box-height:
+        // tall boxes would get giant text) and wraps against the screen width.
+        val textSize = if (allowOverflow) {
+            TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP, 14f, resources.displayMetrics
+            )
+        } else {
+            fittedTextSize(text, innerW, innerH)
+        }
+        val fillPaint = newTextPaint(textSize).apply { color = textColor }
+        val strokePaint = newTextPaint(textSize).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(2f, textSize / 6f)
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+            color = if (textColor == Color.WHITE) Color.BLACK else Color.WHITE
+        }
+
+        val layoutW = if (allowOverflow) {
+            maxOf(innerW, width - box.left - PADDING * 2).coerceAtLeast(1)
+        } else {
+            innerW
+        }
+        val fill = buildLayout(text, layoutW, fillPaint)
+        val layoutHeight = fill?.height ?: 0
+        val textTop = box.top + ((box.height() - layoutHeight) / 2f).coerceAtLeast(0f)
+
+        return Item(
+            text = text,
+            box = box,
+            background = block.backgroundColor,
+            backgroundAlpha = backgroundAlpha,
+            fill = fill,
+            stroke = fill?.let { buildLayout(text, layoutW, strokePaint) },
+            textTop = textTop,
+        )
+    }
+
     /**
-     * Builds a [StaticLayout] that fits within [maxW] x [maxH], shrinking the
-     * font step by step until it does. Returns null for empty text or when even
-     * the smallest font cannot be laid out.
+     * Largest size that fits [innerW] x [innerH], shrinking step by step down to
+     * [MIN_TEXT_SIZE_PX]. Never smaller: when the minimum still doesn't fit, the
+     * text is drawn at [MIN_TEXT_SIZE_PX] and overflows the box (user policy).
      */
-    private fun buildLayout(text: String, maxW: Int, maxH: Int, textColor: Int): StaticLayout? {
-        if (text.isEmpty()) return null
-        val innerW = (maxW - PADDING * 2).coerceAtLeast(1)
-        val innerH = (maxH - PADDING * 2).coerceAtLeast(1)
-
+    private fun fittedTextSize(text: String, innerW: Int, innerH: Int): Float {
+        val minSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, MIN_TEXT_SIZE_SP, resources.displayMetrics
+        )
         var textSize = initialTextSize(innerH)
-        while (textSize >= MIN_TEXT_SIZE_PX) {
-            textPaint.textSize = textSize
-            textPaint.color = textColor
-
-            val layout = StaticLayout.Builder.obtain(text, 0, text.length, textPaint, innerW)
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setIncludePad(false)
-                .setLineSpacing(0f, 1f)
-                .build()
-
-            if (layout.height <= innerH) {
-                return layout
-            }
+        while (textSize > minSize) {
+            val layout = buildLayout(text, innerW, newTextPaint(textSize))
+            if (layout != null && layout.height <= innerH) return textSize
             textSize -= 1f
         }
-        return null
+        return minSize
+    }
+
+    private fun newTextPaint(size: Float): TextPaint {
+        return TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.LEFT
+            textSize = size
+        }
+    }
+
+    private fun buildLayout(text: String, maxW: Int, paint: TextPaint): StaticLayout? {
+        if (text.isEmpty()) return null
+        return StaticLayout.Builder.obtain(text, 0, text.length, paint, maxW)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setIncludePad(false)
+            .setLineSpacing(0f, 1f)
+            .build()
     }
 
     /** Start large — roughly one line filling the box height — and shrink from there. */
@@ -119,8 +203,17 @@ class TranslationView(context: Context) : View(context) {
         return maxOf(fromHeight, fromDensity * density).coerceAtMost(innerH.toFloat())
     }
 
+    private fun overlaps(a: Rect, b: Rect): Boolean {
+        val interW = minOf(a.right, b.right) - maxOf(a.left, b.left)
+        val interH = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
+        if (interW <= 0 || interH <= 0) return false
+        val inter = interW.toLong() * interH
+        val union = a.width().toLong() * a.height() + b.width().toLong() * b.height() - inter
+        return inter * 2 >= union // IoU ≥ 0.5
+    }
+
     companion object {
         private const val PADDING = 4
-        private const val MIN_TEXT_SIZE_PX = 8f
+        private const val MIN_TEXT_SIZE_SP = 12f
     }
 }

@@ -19,13 +19,10 @@ class TranslationCache private constructor(context: Context) :
         db.execSQL(
             """
             CREATE TABLE translations (
-                screen_hash TEXT NOT NULL,
-                bbox_key    TEXT NOT NULL,
-                source_hash TEXT NOT NULL,
+                source_hash TEXT PRIMARY KEY,
                 source_text TEXT NOT NULL,
                 translated  TEXT NOT NULL,
-                updated_at  INTEGER NOT NULL,
-                PRIMARY KEY (screen_hash, bbox_key, source_hash)
+                updated_at  INTEGER NOT NULL
             )
             """.trimIndent()
         )
@@ -37,26 +34,26 @@ class TranslationCache private constructor(context: Context) :
         onCreate(db)
     }
 
-    fun get(screenHash: String, bboxKey: String, sourceHash: String): String? {
+    /**
+     * Translation memory keyed by source text hash only — the same phrase
+     * translates the same on every screen; screen/bbox in the key only
+     * destroys the hit rate on animated screens.
+     */
+    fun get(sourceHash: String): String? {
         readableDatabase.rawQuery(
-            "SELECT translated FROM translations " +
-                    "WHERE screen_hash=? AND bbox_key=? AND source_hash=? LIMIT 1",
-            arrayOf(screenHash, bboxKey, sourceHash),
+            "SELECT translated FROM translations WHERE source_hash=? LIMIT 1",
+            arrayOf(sourceHash),
         ).use { c ->
             return if (c.moveToFirst()) c.getString(0) else null
         }
     }
 
     fun put(
-        screenHash: String,
-        bboxKey: String,
         sourceHash: String,
         sourceText: String,
         translated: String,
     ) {
         val values = ContentValues().apply {
-            put("screen_hash", screenHash)
-            put("bbox_key", bboxKey)
             put("source_hash", sourceHash)
             put("source_text", sourceText)
             put("translated", translated)
@@ -83,8 +80,8 @@ class TranslationCache private constructor(context: Context) :
     }
 
     companion object {
-        private const val DB_NAME = "translations.db"
-        private const val DB_VERSION = 1
+        const val DB_NAME = "translations.db"
+        private const val DB_VERSION = 2
 
         @Volatile
         private var instance: TranslationCache? = null

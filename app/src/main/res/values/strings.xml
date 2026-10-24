@@ -27,17 +27,53 @@
     <string name="touch_setup_adb_copied">adb command copied to clipboard</string>
 
     <!-- Settings -->
-    <string name="settings_fps">Capture rate</string>
-    <string name="settings_opacity">Background opacity</string>
+    <string name="settings_fps">Capture &amp; translate interval</string>
+    <string name="settings_fps_desc">Time between screen capture and OCR + translation runs (100–2000 ms). Translations are cached and unchanged screens are skipped. Applies when capture restarts.</string>
+    <string name="settings_opacity">Translation box opacity</string>
+    <string name="settings_opacity_desc">Background opacity behind translated text (0 = invisible, 100 = solid).</string>
+    <string name="settings_force_every">Forced re-translate interval</string>
+    <string name="settings_force_every_desc">Even when the screen looks unchanged, re-run OCR + translation after this many skipped frames. Heals partial typewriter dialogs. Applies when capture restarts.</string>
+    <string name="settings_change_pct">Frame change sensitivity</string>
+    <string name="settings_change_pct_desc">How much of the screen must change before a frame is re-translated. 0% turns skipping off — every frame is translated. Applies when capture restarts.</string>
+    <string name="settings_ocr_conf">OCR confidence threshold</string>
+    <string name="settings_ocr_conf_desc">Minimum ML Kit confidence for a text block to be translated. Lower = more detections (noisier), higher = stricter. Missing confidence counts as confident. Current frame confidence is logged per frame. Applies when capture restarts.</string>
+    <string name="settings_ocr_conf_value">%1$.2f</string>
+    <string name="settings_line_gap">Multi-line grouping gap</string>
+    <string name="settings_line_gap_desc">Distance between OCR lines, in line heights, before they count as separate text blocks. Higher keeps more lines together in one translation; lower splits them (e.g. character-name plate vs dialog). Applies when capture restarts.</string>
+    <string name="settings_line_gap_value">%1$.1f× line height</string>
+    <string name="settings_pacing">Remote request pacing</string>
+    <string name="settings_pacing_desc">Minimum spacing between translation requests (100–2000 ms). Lower is snappier; too low risks rate limits. Applies when capture restarts.</string>
+    <string name="settings_tw_defer">Typewriter defer</string>
+    <string name="settings_tw_defer_desc">Frames to wait while dialog text is still growing before translating it. 0 = translate immediately (faster, slightly more requests). Applies when capture restarts.</string>
+    <string name="settings_pacing_value">%1$d ms</string>
+    <string name="settings_tw_defer_value">%1$d frames</string>
+    <string name="settings_sync_display">Synchronous display</string>
+    <string name="settings_sync_display_desc">Off (async): each translation appears as soon as it is ready — cache hits are instant, new text fills in progressively. On (sync): the overlay updates once per frame, only when every block is translated. Applies when capture restarts.</string>
+    <string name="settings_clear_after">Clear stalled boxes after</string>
+    <string name="settings_clear_after_desc">How long a translated box stays when its text disappears or no text is detected on screen (1–5 s), after which all dangling boxes are cleared. Applies when capture restarts.</string>
+    <string name="settings_clear_after_value">%1$d s</string>
+    <string name="settings_text_overflow">Allow text overflow</string>
+    <string name="settings_text_overflow_desc">On: translations are not forced into the OCR box — they lay out against the remaining screen width with natural wrapping (no mid-word breaks, no shrinking). Off: text is fitted inside the box. Applies when capture restarts.</string>
+    <string name="settings_normalize_cache">Normalize cache lookups</string>
+    <string name="settings_normalize_cache_desc">Ignores punctuation, symbols, line breaks and full-/half-width differences when looking up cached translations, so near-identical OCR text reuses one translation instead of creating duplicates. Applies when capture restarts.</string>
+    <string name="cache_size_label">Cache size</string>
+    <string name="cache_size_value">Cache size: %1$s</string>
+    <string name="settings_fps_value">%1$d ms</string>
+    <string name="settings_opacity_value">%1$d%%</string>
+    <string name="settings_force_every_value">%1$d frames</string>
+    <string name="settings_change_pct_value">%1$.1f%%</string>
+    <string name="settings_change_pct_off">off (every frame)</string>
     <string name="settings_language">Source language (text on screen)</string>
     <string name="settings_language_applies">Language change applies when capture is restarted.</string>
-    <string name="settings_fps_value">%1$.1f fps</string>
-    <string name="settings_opacity_value">%1$d%%</string>
+    <string name="settings_backend">Translation backend</string>
+    <string name="settings_backend_applies">Backend change applies when capture is restarted.</string>
     <string name="btn_clear_cache">Clear translation cache</string>
-    <string name="btn_download_model">Download translation model</string>
+    <string name="btn_download_model">Download model for selected language</string>
+    <string name="settings_model_url">Model base URL</string>
+    <string name="settings_model_url_desc">Where offline OPUS-MT models are downloaded from. Files are fetched as &lt;URL&gt;/opus-mt-&lt;lang&gt;-en/*. Default: this project\'s GitHub raw models folder.</string>
     <string name="btn_glossary">Edit glossary</string>
     <string name="cache_cleared">Cache cleared</string>
-    <string name="model_downloading">Downloading translation model (~30 MB)…</string>
+    <string name="model_downloading">Downloading offline model (~65 MB, one-time)…</string>
     <string name="model_ready">Translation model ready</string>
     <string name="model_failed">Model download failed. Check network and retry.</string>
     <string name="model_origin">The translation model (e.g. en_zh.zip) is fetched automatically by Google Play Services (ML Kit) from Google\'s servers and stored in this app\'s ML Kit module directory.\nhttps://developers.google.com/ml-kit/language/translation</string>
@@ -57,6 +93,18 @@
         <item>fr</item>
         <item>es</item>
         <item>vi</item>
+    </string-array>
+    <string-array name="backend_labels">
+        <item>OPUS-MT (offline, recommended)</item>
+        <item>Auto (OPUS-MT → Google2 → On-device)</item>
+        <item>Google2 only</item>
+        <item>On-device only (ML Kit)</item>
+    </string-array>
+    <string-array name="backend_codes">
+        <item>opusmt</item>
+        <item>auto</item>
+        <item>google2</item>
+        <item>local</item>
     </string-array>
 
     <!-- Glossary -->

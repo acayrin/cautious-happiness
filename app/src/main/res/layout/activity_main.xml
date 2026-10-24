@@ -211,6 +211,20 @@
                     android:entries="@array/source_language_labels" />
 
                 <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_backend"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <Spinner
+                    android:id="@+id/backendSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:entries="@array/backend_labels" />
+
+                <TextView
                     android:id="@+id/fpsLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -218,13 +232,20 @@
                     android:text="@string/settings_fps"
                     android:textAppearance="?attr/textAppearanceTitleMedium" />
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_fps_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
                 <SeekBar
                     android:id="@+id/fpsSeekBar"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:max="15"
-                    android:progress="5" />
+                    android:max="19"
+                    android:progress="4" />
 
                 <TextView
                     android:id="@+id/opacityLabel"
@@ -234,6 +255,13 @@
                     android:text="@string/settings_opacity"
                     android:textAppearance="?attr/textAppearanceTitleMedium" />
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_opacity_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
                 <SeekBar
                     android:id="@+id/opacitySeekBar"
                     android:layout_width="match_parent"
@@ -241,6 +269,236 @@
                     android:layout_marginTop="4dp"
                     android:max="100"
                     android:progress="90" />
+
+                <TextView
+                    android:id="@+id/forceLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_force_every"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_force_every_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/forceSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="14"
+                    android:progress="4" />
+
+                <TextView
+                    android:id="@+id/changeLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_change_pct"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_change_pct_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/changeSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="50"
+                    android:progress="6" />
+
+                <TextView
+                    android:id="@+id/ocrConfLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_ocr_conf"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_ocr_conf_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/ocrConfSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="95"
+                    android:progress="50" />
+
+                <TextView
+                    android:id="@+id/lineGapLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_line_gap"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_line_gap_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/lineGapSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="13"
+                    android:progress="5" />
+
+                <TextView
+                    android:id="@+id/pacingLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_pacing"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_pacing_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/pacingSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="19"
+                    android:progress="1" />
+
+                <TextView
+                    android:id="@+id/twDeferLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_tw_defer"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_tw_defer_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/twDeferSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="3"
+                    android:progress="0" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/syncSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_sync_display"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_sync_display_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <TextView
+                    android:id="@+id/clearAfterLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_clear_after"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_clear_after_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <SeekBar
+                    android:id="@+id/clearAfterSeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="4"
+                    android:progress="1" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/overflowSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_text_overflow"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_text_overflow_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/normalizeSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_normalize_cache"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_normalize_cache_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <TextView
+                    android:id="@+id/modelUrlLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_model_url"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_model_url_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <EditText
+                    android:id="@+id/modelUrlInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:inputType="textUri"
+                    android:maxLines="3"
+                    android:importantForAutofill="no" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/downloadModelButton"
@@ -265,6 +523,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="@string/btn_glossary" />
+
+                <TextView
+                    android:id="@+id/cacheSizeText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/cache_size_label"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/clearCacheButton"

@@ -28,6 +28,9 @@ import com.overlaytranslator.overlay.OverlayConfig
 import com.overlaytranslator.ocr.MlKitOcrProcessor
 import com.overlaytranslator.translate.Glossary
 import com.overlaytranslator.translate.TranslatePipeline
+import com.overlaytranslator.translate.OpusMtTranslator
+import com.overlaytranslator.translate.RemoteTranslator
+import com.overlaytranslator.translate.TranslationChain
 import com.overlaytranslator.translate.Translator
 import com.overlaytranslator.util.FrameDiffGate
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +38,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Foreground service that captures the screen, runs OCR + translation, and
@@ -87,13 +91,15 @@ class CaptureService : Service() {
 
     private var captureThread: HandlerThread? = null
     private var captureHandler: Handler? = null
-    private val frameGate = FrameDiffGate()
+    private var frameGate = FrameDiffGate()
     private var lastTickMillis = 0L
     private var framesSeen = 0
+    private var skippedFrames = 0
+    private val pendingFrame = AtomicReference<Bitmap?>()
+    private val pipelineBusy = AtomicBoolean(false)
     private val displayManager by lazy { getSystemService(DisplayManager::class.java) }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val pipelineSeq = AtomicInteger()
 
     private var screenDensityDpi = 0
     private var screenWidth = 0
@@ -149,25 +155,74 @@ class CaptureService : Service() {
 
     private var config = OverlayConfig()
 
+    private fun loadConfig(): OverlayConfig {
+        val p = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
+        return OverlayConfig(
+            captureIntervalMs = p.getInt(
+                OverlayConfig.KEY_INTERVAL_MS,
+                -1,
+            ).takeIf { it > 0 }
+                ?: ((1000f / p.getFloat(OverlayConfig.KEY_FPS, 1.0f)).toInt())
+                    .coerceIn(OverlayConfig.MIN_INTERVAL_MS.toInt(), OverlayConfig.MAX_INTERVAL_MS.toInt()),
+            backgroundAlpha = p.getInt(OverlayConfig.KEY_ALPHA, 230),
+            forceEvery = p.getInt(OverlayConfig.KEY_FORCE_EVERY, 5),
+            changePct = p.getFloat(OverlayConfig.KEY_CHANGE_PCT, 0.6f),
+            ocrConfidence = p.getFloat(OverlayConfig.KEY_OCR_CONF, 0.5f),
+            multilineGap = p.getFloat(OverlayConfig.KEY_LINE_GAP, 0.7f),
+            requestPacingMs = p.getInt(OverlayConfig.KEY_PACING_MS, 250),
+            typewriterDefer = p.getInt(OverlayConfig.KEY_TW_DEFER, 0),
+            synchronousDisplay = p.getBoolean(OverlayConfig.KEY_SYNC_DISPLAY, false),
+            clearAfterSeconds = p.getInt(OverlayConfig.KEY_CLEAR_AFTER, 2),
+            allowTextOverflow = p.getBoolean(OverlayConfig.KEY_TEXT_OVERFLOW, false),
+            normalizeCacheKeys = p.getBoolean(OverlayConfig.KEY_NORMALIZE_CACHE, false),
+            modelBaseUrl = p.getString(
+                OverlayConfig.KEY_MODEL_URL, OverlayConfig.DEFAULT_MODEL_URL,
+            ) ?: OverlayConfig.DEFAULT_MODEL_URL,
+        )
+    }
+
     override fun onCreate() {
         super.onCreate()
+        config = loadConfig()
+        frameGate = FrameDiffGate(config.changedCells)
+        RemoteTranslator.minIntervalMs = config.requestPacingMs.toLong().coerceIn(100L, 2000L)
         notificationHelper = NotificationHelper(this)
         notificationHelper.ensureChannel()
         overlay = OverlayService(this)
+        overlay.setAllowOverflow(config.allowTextOverflow)
 
         val db = TranslationCache.get(this)
         val lang = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
             .getString(OverlayConfig.KEY_LANG, OverlayConfig.LANG_ZH) ?: OverlayConfig.LANG_ZH
-        val translator = Translator(lang)
+        val localTranslator = Translator(lang)
+        val backend = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
+            .getString(OverlayConfig.KEY_BACKEND, OverlayConfig.BACKEND_OPUSMT) ?: OverlayConfig.BACKEND_OPUSMT
+        val offline = OpusMtTranslator(this, lang, config.modelBaseUrl)
+        val translator = TranslationChain(lang, localTranslator, backend, offline)
         scope.launch {
-            Log.i(TAG, "Translation model ($lang→en) downloaded=${translator.ensureModelDownloaded()}")
+            Log.i(TAG, "Translation model ($lang→en) downloaded=${localTranslator.ensureModelDownloaded()}")
         }
         pipeline = TranslatePipeline(
-            ocr = MlKitOcrProcessor(lang),
+            ocr = MlKitOcrProcessor(lang, config.multilineGap),
             translator = translator,
             glossary = loadGlossary(),
             cache = db,
+            minConfidence = config.ocrConfidence,
+            requireCjk = lang == "zh" || lang == "ja" || lang == "ko",
+            maxDefer = config.typewriterDefer,
+            synchronousDisplay = config.synchronousDisplay,
+            clearAfterSeconds = config.clearAfterSeconds,
+            normalizeCache = config.normalizeCacheKeys,
         )
+        // Fetch the offline translation model in the background when missing.
+        scope.launch {
+            OpusMtTranslator.ensureModel(this@CaptureService, lang, config.modelBaseUrl)
+        }
+        // Warm up the OCR model so the first real frame doesn't pay its load time.
+        scope.launch {
+            runCatching { pipeline.process(Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)) }
+            Log.i(TAG, "OCR model warmed up")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -342,25 +397,63 @@ class CaptureService : Service() {
         }
 
         val frame = bitmap ?: return
-        if (!frameGate.shouldProcess(frame)) {
+        val changed = frameGate.shouldProcess(frame)
+        if (!changed && ++skippedFrames < config.forceEvery) {
             Log.d(TAG, "Frame skipped (unchanged)")
+            overlay.status("skipped (unchanged)")
             frame.recycle()
             return
         }
+        skippedFrames = 0
+        submitFrame(frame)
+    }
 
-        scope.launch {
-            val seq = pipelineSeq.incrementAndGet()
-            val rendered = try {
-                pipeline.process(frame)
+    /**
+     * Coalesces pipeline runs: one at a time, and a newer frame replaces the
+     * pending one, so stale queued frames never burn translation requests.
+     * Combined with the forced reprocess every [config] forceEvery skipped
+     * frames, a stale partial result (e.g. mid-typewriter dialog) always gets
+     * healed.
+     */
+    private fun submitFrame(frame: Bitmap) {
+        pendingFrame.getAndSet(frame)?.recycle()
+        if (pipelineBusy.compareAndSet(false, true)) {
+            scope.launch { drainFrames() }
+        }
+    }
+
+    private suspend fun drainFrames() {
+        while (true) {
+            val current = pendingFrame.getAndSet(null) ?: break
+            val result = try {
+                pipeline.process(current) { partial ->
+                    overlay.update(partial.blocks, config.backgroundAlpha)
+                    overlay.status(
+                        if (partial.translateMs == 0L) {
+                            "cached · ${partial.blocks.size} blocks"
+                        } else {
+                            "ocr ${partial.ocrMs}ms · tr ${partial.translateMs}ms · ${partial.blocks.size} blocks"
+                        }
+                    )
+                }
             } catch (t: Throwable) {
                 Log.w(TAG, "Translation pipeline failed", t)
-                emptyList()
+                TranslatePipeline.FrameResult(emptyList(), 0, 0)
             }
-            // A slower run from an older frame must not overwrite a newer one.
-            val stale = seq != pipelineSeq.get()
-            Log.i(TAG, "Frame processed: ${rendered.size} blocks${if (stale) " (stale, dropped)" else ""}")
-            if (!stale) overlay.update(rendered, config.backgroundAlpha)
-            frame.recycle()
+            // Results are emitted via the onUpdate callback (cache hits first,
+            // then the full result) — processing is strictly in frame order.
+            val superseded = pendingFrame.get() != null
+            Log.i(
+                TAG,
+                "Frame processed: ${result.blocks.size} blocks in ocr ${result.ocrMs}ms + tr ${result.translateMs}ms" +
+                        " · conf ${(result.avgConfidence * 100).toInt()}%" +
+                        if (superseded) " (newer frame queued)" else "",
+            )
+            current.recycle()
+        }
+        pipelineBusy.set(false)
+        if (pendingFrame.get() != null && pipelineBusy.compareAndSet(false, true)) {
+            scope.launch { drainFrames() }
         }
     }
 

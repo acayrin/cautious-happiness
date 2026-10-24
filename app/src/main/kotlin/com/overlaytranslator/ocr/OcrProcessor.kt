@@ -24,7 +24,10 @@ interface OcrEngine {
     fun close()
 }
 
-class MlKitOcrProcessor(language: String = "zh") : OcrEngine {
+class MlKitOcrProcessor(
+    language: String = "zh",
+    private val gapRatio: Float = Ocr.DEFAULT_GAP_RATIO,
+) : OcrEngine {
 
     private val recognizer = TextRecognition.getClient(
         when (language) {
@@ -42,12 +45,20 @@ class MlKitOcrProcessor(language: String = "zh") : OcrEngine {
                 .addOnSuccessListener { cont.resume(it) }
                 .addOnFailureListener { cont.resumeWithException(it) }
         }
-        return result.textBlocks.mapNotNull { block ->
-            val box = block.boundingBox ?: return@mapNotNull null
-            val text = block.text.trim()
-            if (text.isEmpty()) return@mapNotNull null
-            val confidence = block.lines.map { it.confidence ?: 0f }.maxOrNull() ?: 0f
-            OcrBlock(Rect(box), text, confidence)
+        return result.textBlocks.flatMap { block ->
+            val lines = block.lines.filter { it.boundingBox != null && it.text.isNotBlank() }
+            if (lines.isEmpty()) return@flatMap emptyList<OcrBlock>()
+            val tops = IntArray(lines.size) { lines[it].boundingBox!!.top }
+            val bottoms = IntArray(lines.size) { lines[it].boundingBox!!.bottom }
+            Ocr.groupLines(tops, bottoms, gapRatio).map { idx ->
+                val box = Rect(lines[idx[0]].boundingBox!!)
+                for (k in 1 until idx.size) box.union(lines[idx[k]].boundingBox!!)
+                val text = idx.joinToString("\n") { lines[it].text.trim() }
+                val confidence = idx.maxOf { i ->
+                    lines[i].confidence ?: 1f
+                }
+                OcrBlock(box, text, confidence)
+            }
         }
     }
 
@@ -61,7 +72,59 @@ object Ocr {
     const val MIN_CONFIDENCE = 0.5f
     const val MIN_TEXT_LENGTH = 2
 
-    fun isWorthTranslating(block: OcrBlock): Boolean {
-        return block.confidence >= MIN_CONFIDENCE && block.sourceText.length >= MIN_TEXT_LENGTH
+    fun isWorthTranslating(block: OcrBlock, minConfidence: Float = MIN_CONFIDENCE): Boolean {
+        return block.confidence >= minConfidence && block.sourceText.length >= MIN_TEXT_LENGTH
+    }
+
+    /**
+     * True when the text contains at least one Han, Kana or Hangul character.
+     * Used for CJK source languages to skip blocks that are already English /
+     * numeric / symbols (UI labels, URLs, counts) and would only waste requests.
+     */
+    fun containsCjk(text: String): Boolean {
+        for (ch in text) {
+            val c = ch.code
+            if (c in 0x4E00..0x9FFF || c in 0x3400..0x4DBF ||      // Han + ext A
+                c in 0x3040..0x30FF ||                            // Hiragana + Katakana
+                c in 0xAC00..0xD7AF || c in 0x1100..0x11FF ||     // Hangul syllables + Jamo
+                c in 0x3130..0x318F                               // Hangul compat Jamo
+            ) return true
+        }
+        return false
+    }
+
+    /** Default grouping threshold: gap > 0.7 x line height starts a new group. */
+    const val DEFAULT_GAP_RATIO = 0.7f
+
+    /**
+     * Splits OCR lines into groups of vertically adjacent lines. A gap larger
+     * than [gapRatio] line heights starts a new group — that separates UI
+     * elements ML Kit merged into one block (e.g. a character-name plate above
+     * the dialog box) while keeping wrapped dialog lines together.
+     */
+    fun groupLines(
+        tops: IntArray,
+        bottoms: IntArray,
+        gapRatio: Float = DEFAULT_GAP_RATIO,
+    ): List<List<Int>> {
+        require(tops.size == bottoms.size) { "tops and bottoms must match" }
+        if (tops.isEmpty()) return emptyList()
+        val order = tops.indices.sortedBy { tops[it] }
+        val groups = mutableListOf<List<Int>>()
+        var current = mutableListOf(order.first())
+        for (k in 1 until order.size) {
+            val i = order[k]
+            val last = current.last()
+            val gap = tops[i] - bottoms[last]
+            val height = (bottoms[last] - tops[last]).coerceAtLeast(1)
+            if (gap > height * gapRatio) {
+                groups.add(current)
+                current = mutableListOf(i)
+            } else {
+                current.add(i)
+            }
+        }
+        groups.add(current)
+        return groups
     }
 }

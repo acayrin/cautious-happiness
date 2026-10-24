@@ -28,16 +28,38 @@ object TranslationKeys {
         return "$l,$t,$r,$b"
     }
 
-    /** sha256 hex of the source text (post-glossary, pre-translation). */
-    fun sourceHash(text: String): String {
+    /**
+     * sha256 hex of the source text (post-glossary, pre-translation).
+     * With [normalize] the text is folded first so OCR variants (punctuation,
+     * whitespace/newlines, full-/half-width forms) share one cache entry.
+     */
+    fun sourceHash(text: String, normalize: Boolean = false): String {
+        val input = if (normalize) normalizeForCache(text) else text
         val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(text.toByteArray(Charsets.UTF_8))
+        val digest = md.digest(input.toByteArray(Charsets.UTF_8))
         return buildString(digest.size * 2) {
             for (byte in digest) {
                 append(HEX[(byte.toInt() shr 4) and 0xF])
                 append(HEX[byte.toInt() and 0xF])
             }
         }
+    }
+
+    /**
+     * Folds OCR variants for translation-memory lookups: NFKC (full-width to
+     * half-width), drops punctuation/symbols (♪, ■, ellipsis, brackets),
+     * collapses whitespace, lowercases Latin. CJK letters are kept.
+     */
+    fun normalizeForCache(text: String): String {
+        val folded = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC)
+            .lowercase()
+        val sb = StringBuilder(folded.length)
+        for (ch in folded) {
+            // Whitespace is dropped entirely: CJK has no meaningful spaces, and
+            // for Latin it folds spacing variants together harmlessly.
+            if (ch.isLetterOrDigit()) sb.append(ch)
+        }
+        return sb.toString()
     }
 
     /** Hex representation of the frame's perceptual hash. */
