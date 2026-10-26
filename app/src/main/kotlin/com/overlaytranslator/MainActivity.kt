@@ -130,13 +130,13 @@ class MainActivity : AppCompatActivity() {
 
     /** Edge-to-edge is enforced at targetSdk 35: pad the settings screen clear
      *  of the status bar / display cutout and the navigation bar, whatever
-     *  shape the device has. */
+     *  shape the device has. Content padding lives in the layout (16dp); only
+     *  the system insets are applied here. */
     private fun applyWindowInsets() {
-        val pad = (16 * resources.displayMetrics.density).toInt()
         findViewById<View>(R.id.settings_root).setOnApplyWindowInsetsListener { v, insets ->
             val top = insets.getInsets(WindowInsets.Type.statusBars()).top
             val bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
-            v.setPadding(pad, top + pad, pad, bottom + pad)
+            v.setPadding(0, top, 0, bottom)
             insets
         }
     }
@@ -493,11 +493,11 @@ class MainActivity : AppCompatActivity() {
     private fun refreshTouchSetupUi() {
         val blocked = Permissions.isUntrustedTouchBlocked(this)
         if (!blocked) {
-            touchSetupCard.setCardBackgroundColor(0xFFE8F5E9.toInt())
+            touchSetupCard.setCardBackgroundColor(themeColor(com.google.android.material.R.attr.colorSecondaryContainer))
             touchSetupStatus.text = getString(R.string.touch_setup_ok)
             touchSetupActions.visibility = android.view.View.GONE
         } else {
-            touchSetupCard.setCardBackgroundColor(0xFFFFF3E0.toInt())
+            touchSetupCard.setCardBackgroundColor(themeColor(com.google.android.material.R.attr.colorErrorContainer))
             touchSetupStatus.text = getString(R.string.touch_setup_blocked)
             touchSetupActions.visibility = android.view.View.VISIBLE
         }
@@ -552,6 +552,13 @@ class MainActivity : AppCompatActivity() {
         audioSwitch.isChecked = config.audioEnabled
         val qualities = resources.getStringArray(R.array.audio_quality_codes)
         audioQualitySpinner.setSelection(qualities.indexOf(config.audioQuality).coerceAtLeast(0))
+    }
+
+    /** Resolves a theme color attribute (follows the Material You palette). */
+    private fun themeColor(attr: Int): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 
     private fun currentLang(): String {
