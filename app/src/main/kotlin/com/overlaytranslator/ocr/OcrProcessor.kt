@@ -5,6 +5,7 @@ import android.graphics.Rect
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -34,7 +35,8 @@ class MlKitOcrProcessor(
             "zh" -> ChineseTextRecognizerOptions.Builder().build()
             "ja" -> JapaneseTextRecognizerOptions.Builder().build()
             "ko" -> KoreanTextRecognizerOptions.Builder().build()
-            else -> TextRecognizerOptions.DEFAULT_OPTIONS // Latin script: fr, es, vi, …
+            "hi" -> DevanagariTextRecognizerOptions.Builder().build()
+            else -> TextRecognizerOptions.DEFAULT_OPTIONS // Latin script: fr, es, vi, de, …
         }
     )
 

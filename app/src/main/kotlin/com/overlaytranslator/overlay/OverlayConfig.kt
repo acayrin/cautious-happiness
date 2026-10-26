@@ -32,6 +32,10 @@ data class OverlayConfig(
     val modelBaseUrl: String = DEFAULT_MODEL_URL,
     /** When true the overlay is temporarily invisible (used by the "hide" toggle). */
     val hidden: Boolean = false,
+    /** Audio subtitles: transcribe the captured app's audio and show a translation. */
+    val audioEnabled: Boolean = false,
+    /** "fast" (whisper tiny, default) or "accurate" (whisper base). */
+    val audioQuality: String = AUDIO_FAST,
 ) {
     val captureIntervalMillis: Long
         get() = captureIntervalMs.toLong().coerceIn(MIN_INTERVAL_MS, MAX_INTERVAL_MS)
@@ -66,6 +70,11 @@ data class OverlayConfig(
         const val DEFAULT_MODEL_URL =
             "https://raw.githubusercontent.com/acayrin/cautious-happiness/main/models"
         const val KEY_BACKEND = "translation_backend"
+        const val KEY_AUDIO_ENABLED = "audio_enabled"
+        const val KEY_AUDIO_QUALITY = "audio_quality"
+
+        const val AUDIO_FAST = "fast"
+        const val AUDIO_ACCURATE = "accurate"
 
         const val BACKEND_AUTO = "auto"
         const val BACKEND_OPUSMT = "opusmt"

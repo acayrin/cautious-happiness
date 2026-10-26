@@ -2,15 +2,20 @@
 
 Live screen translation overlay for Android games: captures the screen, runs OCR,
 translates, and paints the English over the original text. Built for Chinese/Japanese
-mobile games (tested on *Witch Weapon* / 魔女兵器), works for Korean, French, Spanish
-and Vietnamese sources too.
+mobile games (tested on *Witch Weapon* / 魔女兵器), works for Korean, French, Spanish,
+Vietnamese, German, Italian, Portuguese, Dutch, Polish, Swedish, Turkish, Indonesian,
+Hindi and Czech sources too.
 
 ## Features
 
 - **Screen capture** via MediaProjection, event-driven, rotation- and cutout-aware
-- **OCR**: ML Kit on-device text recognition (Chinese / Japanese / Korean / Latin models)
+- **OCR**: ML Kit on-device text recognition (Chinese / Japanese / Korean / Latin /
+  Devanagari models)
   - CJK-script filter (English UI noise is skipped), confidence threshold,
     line-grouping gap (name plates vs dialog), ghost persistence for stable boxes
+- **Audio subtitles** (optional): captures the captured app's audio
+  (AudioPlaybackCapture), transcribes it on-device with whisper.cpp and shows the
+  English translation in a bottom band. Fast (tiny) and Accurate (base) quality
 - **Translation chain**, selectable in settings:
   - **OPUS-MT (offline)** — Helsinki-NLP Marian via CTranslate2 int8, models
     downloaded on demand from the configured model URL
@@ -23,13 +28,15 @@ and Vietnamese sources too.
   (ignores punctuation/whitespace/width variants); cache size shown in settings
 - **Glossary** (Chinese → English terms applied before translation)
 - **Status chip** in the overlay: OCR/translation timings, cache hits, skips
+- Settings screen is notch/cutout aware (WindowInsets padding)
 - Touch passthrough (Android 12+ needs *Allow untrusted touches* in Developer options)
 
 ## Requirements
 
 - Android 11+ (minSdk 30), arm64-v8a
 - Overlay permission + notification permission
-- For optional offline OPUS-MT: internet once to download the model (~65 MB per language)
+- For optional offline OPUS-MT: internet once to download the model (~77 MB per language)
+- For audio subtitles: internet once per whisper model (31 MB fast / 57 MB accurate)
 
 ## Build
 
@@ -38,8 +45,7 @@ export JAVA_HOME=<jdk17>
 export ANDROID_HOME=<sdk>          # ANDROID_SDK_ROOT must match
 export PATH=$JAVA_HOME/bin:$PATH
 cd app/src/main/cpp
-./build-deps.sh                    # CTranslate2 + sentencepiece static libs (arm64)
-./assets/...                       # (no assets needed)
+bash build-deps.sh               # CTranslate2 + sentencepiece + whisper.cpp static libs (arm64)
 ./gradlew :app:assembleRelease     # APK at app/build/outputs/apk/release/
 ./gradlew :app:testDebugUnitTest   # JVM unit tests
 ```
@@ -53,6 +59,12 @@ Pre-converted OPUS-MT int8 models live in [`models/`](models) (one folder per pa
 `opus-mt-<src>-en/` with `model.bin`, `config.json`, `shared_vocabulary.json`,
 `source.spm`, `target.spm`). The app downloads them from the **Model base URL**
 setting (default: this repo's raw URL) into app storage on first use.
+
+`models/whisper/` holds the whisper.cpp ggml models for audio subtitles
+(`ggml-tiny-q5_1.bin` fast, `ggml-base-q5_1.bin` accurate), downloaded the same way.
+Note: `Helsinki-NLP/opus-mt-pt-en` does not exist — the `opus-mt-pt-en/` folder is
+the multilingual `opus-mt-ROMANCE-en` model (covers Portuguese; Romance languages
+share one model).
 
 Conversion recipe (from the Helsinki-NLP transformers checkpoints):
 
@@ -73,7 +85,9 @@ ct2-transformers-converter --model opus-mt-<src>-en --output_dir out \
 - `translate/` — `TranslatePipeline` (OCR → glossary → cache → batch translate),
   `TranslationChain` (backend routing), `RemoteTranslator` (Google2),
   `OpusMtTranslator` (CTranslate2 JNI), `Translator` (ML Kit)
-- `overlay/` — `TranslationView` (single-window painter), `OverlayConfig`
+- `overlay/` — `TranslationView` (single-window painter + subtitle band), `OverlayConfig`
+- `audio/` — `AudioSubtitleEngine` (capture → chunk → transcribe → translate),
+  `WhisperTranscriber` (whisper.cpp JNI), `SubtitleChunker` (windowing + VAD gate)
 - `service/OverlayService.kt` — the one overlay window + WM "poke" window
 - `cache/` — SQLite translation memory
 
@@ -83,3 +97,6 @@ ct2-transformers-converter --model opus-mt-<src>-en --output_dir out \
   orientation at start; rotating mid-session re-adapts the display
 - Comic/vertical Japanese text is not supported (ML Kit limitation)
 - The keyless Google2 endpoint can rate-limit; requests are serialized and paced
+- Audio subtitles: apps that set `allowAudioCapture=false` or use FLAG_SECURE/DRM
+  deliver silence; background music/sound effects reduce transcription accuracy;
+  subtitles arrive in ~4 s chunks (whisper is not streaming)

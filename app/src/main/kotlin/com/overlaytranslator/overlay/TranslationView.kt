@@ -11,6 +11,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.TypedValue
 import android.view.View
+import android.view.WindowInsets
 import com.overlaytranslator.ocr.RenderedBlock
 import com.overlaytranslator.util.ColorSampler
 
@@ -54,6 +55,25 @@ class TranslationView(context: Context) : View(context) {
         )
     }
 
+    private val subtitlePaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        typeface = Typeface.DEFAULT_BOLD
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, 14f, resources.displayMetrics
+        )
+    }
+    private var subtitle: String? = null
+    private var subtitleLayout: StaticLayout? = null
+    private var subtitleLayoutWidth = 0
+
+    /** Audio subtitle text (bottom-center band); null clears it. */
+    fun setSubtitle(text: String?) {
+        if (subtitle == text) return
+        subtitle = text
+        subtitleLayout = null
+        invalidate()
+    }
+
     /** Status chip content, e.g. "translate 512ms · 4 blocks" or "skipped". */
     fun setStatus(text: String) {
         statusText = text
@@ -79,6 +99,15 @@ class TranslationView(context: Context) : View(context) {
         invalidate()
     }
 
+    /** Inset clear of the top cutout/notch and the nav bar, whatever the device. */
+    private fun safeTop(): Int = rootWindowInsets?.let {
+        maxOf(it.displayCutout?.safeInsetTop ?: 0, it.getInsets(WindowInsets.Type.statusBars()).top)
+    } ?: 0
+
+    private fun safeBottom(): Int = rootWindowInsets?.let {
+        maxOf(it.displayCutout?.safeInsetBottom ?: 0, it.getInsets(WindowInsets.Type.navigationBars()).bottom)
+    } ?: 0
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         for (item in items) {
@@ -101,9 +130,33 @@ class TranslationView(context: Context) : View(context) {
             val chipW = chipTextPaint.measureText(statusText) + pad * 2
             val chipH = (fm.bottom - fm.top) + pad * 2
             val right = width - 16f
-            val top = 16f
+            val top = 16f + safeTop()
             canvas.drawRoundRect(right - chipW, top, right, top + chipH, 12f, 12f, chipPaint)
             canvas.drawText(statusText, right - chipW + pad, top + pad - fm.top, chipTextPaint)
+        }
+
+        val sub = subtitle
+        if (!sub.isNullOrEmpty()) {
+            val pad = 12f
+            val maxW = (width - 64f).toInt().coerceAtLeast(1)
+            var layout = subtitleLayout
+            if (layout == null || subtitleLayoutWidth != maxW) {
+                layout = StaticLayout.Builder.obtain(sub, 0, sub.length, subtitlePaint, maxW)
+                    .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                    .setIncludePad(false)
+                    .build()
+                subtitleLayout = layout
+                subtitleLayoutWidth = maxW
+            }
+            val bandW = maxW + pad * 2
+            val bandH = layout.height + pad * 2
+            val cx = width / 2f
+            val bottom = height - safeBottom() - 16f
+            canvas.drawRoundRect(cx - bandW / 2f, bottom - bandH, cx + bandW / 2f, bottom, 12f, 12f, chipPaint)
+            canvas.save()
+            canvas.translate(cx - maxW / 2f, bottom - bandH + pad)
+            layout.draw(canvas)
+            canvas.restore()
         }
     }
 

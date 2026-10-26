@@ -25,3 +25,30 @@ target_link_libraries(opusmt ct2 spm log atomic)
 
 target_link_options(opusmt PRIVATE -Wl,--gc-sections -Wl,--exclude-libs,ALL)
 
+# ---- whisper.cpp (speech-to-text) ----
+add_library(whisper STATIC IMPORTED)
+set_target_properties(whisper PROPERTIES
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/deps/build-whisper/src/libwhisper.a)
+
+add_library(ggml STATIC IMPORTED)
+set_target_properties(ggml PROPERTIES
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/deps/build-whisper/ggml/src/libggml.a)
+
+add_library(ggml-cpu STATIC IMPORTED)
+set_target_properties(ggml-cpu PROPERTIES
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/deps/build-whisper/ggml/src/libggml-cpu.a)
+
+add_library(ggml-base STATIC IMPORTED)
+set_target_properties(ggml-base PROPERTIES
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/deps/build-whisper/ggml/src/libggml-base.a)
+
+add_library(whisperjni SHARED whisper_jni.cpp)
+
+target_include_directories(whisperjni PRIVATE
+  deps/whisper.cpp/include
+  deps/whisper.cpp/ggml/include)
+
+target_link_libraries(whisperjni whisper ggml ggml-cpu ggml-base log atomic)
+
+target_link_options(whisperjni PRIVATE -Wl,--gc-sections -Wl,--exclude-libs,ALL)
+

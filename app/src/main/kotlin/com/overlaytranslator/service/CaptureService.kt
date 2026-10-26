@@ -23,6 +23,7 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
+import com.overlaytranslator.audio.AudioSubtitleEngine
 import com.overlaytranslator.cache.TranslationCache
 import com.overlaytranslator.overlay.OverlayConfig
 import com.overlaytranslator.ocr.MlKitOcrProcessor
@@ -154,6 +155,9 @@ class CaptureService : Service() {
     }
 
     private var config = OverlayConfig()
+    private var sourceLang: String = OverlayConfig.LANG_ZH
+    private var backendCode: String = OverlayConfig.BACKEND_OPUSMT
+    private var subtitleEngine: AudioSubtitleEngine? = null
 
     private fun loadConfig(): OverlayConfig {
         val p = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
@@ -178,6 +182,10 @@ class CaptureService : Service() {
             modelBaseUrl = p.getString(
                 OverlayConfig.KEY_MODEL_URL, OverlayConfig.DEFAULT_MODEL_URL,
             ) ?: OverlayConfig.DEFAULT_MODEL_URL,
+            audioEnabled = p.getBoolean(OverlayConfig.KEY_AUDIO_ENABLED, false),
+            audioQuality = p.getString(
+                OverlayConfig.KEY_AUDIO_QUALITY, OverlayConfig.AUDIO_FAST,
+            ) ?: OverlayConfig.AUDIO_FAST,
         )
     }
 
@@ -192,23 +200,23 @@ class CaptureService : Service() {
         overlay.setAllowOverflow(config.allowTextOverflow)
 
         val db = TranslationCache.get(this)
-        val lang = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
+        sourceLang = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
             .getString(OverlayConfig.KEY_LANG, OverlayConfig.LANG_ZH) ?: OverlayConfig.LANG_ZH
-        val localTranslator = Translator(lang)
-        val backend = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
+        val localTranslator = Translator(sourceLang)
+        backendCode = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
             .getString(OverlayConfig.KEY_BACKEND, OverlayConfig.BACKEND_OPUSMT) ?: OverlayConfig.BACKEND_OPUSMT
-        val offline = OpusMtTranslator(this, lang, config.modelBaseUrl)
-        val translator = TranslationChain(lang, localTranslator, backend, offline)
+        val offline = OpusMtTranslator(this, sourceLang, config.modelBaseUrl)
+        val translator = TranslationChain(sourceLang, localTranslator, backendCode, offline)
         scope.launch {
-            Log.i(TAG, "Translation model ($lang→en) downloaded=${localTranslator.ensureModelDownloaded()}")
+            Log.i(TAG, "Translation model ($sourceLang→en) downloaded=${localTranslator.ensureModelDownloaded()}")
         }
         pipeline = TranslatePipeline(
-            ocr = MlKitOcrProcessor(lang, config.multilineGap),
+            ocr = MlKitOcrProcessor(sourceLang, config.multilineGap),
             translator = translator,
             glossary = loadGlossary(),
             cache = db,
             minConfidence = config.ocrConfidence,
-            requireCjk = lang == "zh" || lang == "ja" || lang == "ko",
+            requireCjk = sourceLang == "zh" || sourceLang == "ja" || sourceLang == "ko",
             maxDefer = config.typewriterDefer,
             synchronousDisplay = config.synchronousDisplay,
             clearAfterSeconds = config.clearAfterSeconds,
@@ -216,7 +224,7 @@ class CaptureService : Service() {
         )
         // Fetch the offline translation model in the background when missing.
         scope.launch {
-            OpusMtTranslator.ensureModel(this@CaptureService, lang, config.modelBaseUrl)
+            OpusMtTranslator.ensureModel(this@CaptureService, sourceLang, config.modelBaseUrl)
         }
         // Warm up the OCR model so the first real frame doesn't pay its load time.
         scope.launch {
@@ -308,10 +316,35 @@ class CaptureService : Service() {
         displayManager.registerDisplayListener(displayListener, captureHandler)
         ensureCaptureSurfaces()
         captureHandler?.post(healTick)
+        startSubtitles(projection)
         Log.i(TAG, "Capture started${if (imageReader != null) " at ${screenWidth}x$screenHeight" else ": waiting for landscape"}")
     }
 
+    /** Audio subtitles: transcribe the captured app's audio to English. */
+    private fun startSubtitles(projection: MediaProjection) {
+        if (!config.audioEnabled) return
+        subtitleEngine = AudioSubtitleEngine(
+            context = this,
+            translator = TranslationChain(
+                sourceLang,
+                Translator(sourceLang),
+                backendCode,
+                OpusMtTranslator(this, sourceLang, config.modelBaseUrl),
+            ),
+            cache = TranslationCache.get(this),
+            normalizeCache = config.normalizeCacheKeys,
+            clearAfterSeconds = config.clearAfterSeconds,
+            scope = scope,
+            onSubtitle = { overlay.subtitle(it) },
+            onCleared = { overlay.subtitle(null) },
+        ).also {
+            it.start(projection, sourceLang, config.audioQuality, config.modelBaseUrl)
+        }
+    }
+
     private fun stopCapture() {
+        subtitleEngine?.stop()
+        subtitleEngine = null
         runCatching { displayManager.unregisterDisplayListener(displayListener) }
         captureHandler?.removeCallbacks(healTick)
         captureThread?.quitSafely()

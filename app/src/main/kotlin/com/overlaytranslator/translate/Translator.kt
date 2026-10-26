@@ -143,6 +143,16 @@ class Translator(sourceLanguage: String = DEFAULT_SOURCE) : TextTranslator {
             "fr" -> TranslateLanguage.FRENCH
             "es" -> TranslateLanguage.SPANISH
             "vi" -> TranslateLanguage.VIETNAMESE
+            "de" -> TranslateLanguage.GERMAN
+            "it" -> TranslateLanguage.ITALIAN
+            "pt" -> TranslateLanguage.PORTUGUESE
+            "nl" -> TranslateLanguage.DUTCH
+            "pl" -> TranslateLanguage.POLISH
+            "sv" -> TranslateLanguage.SWEDISH
+            "tr" -> TranslateLanguage.TURKISH
+            "id" -> TranslateLanguage.INDONESIAN
+            "hi" -> TranslateLanguage.HINDI
+            "cs" -> TranslateLanguage.CZECH
             else -> TranslateLanguage.CHINESE
         }
     }

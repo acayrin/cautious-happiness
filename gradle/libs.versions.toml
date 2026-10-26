@@ -25,6 +25,7 @@ mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-c
 mlkit-text-recognition-japanese = { module = "com.google.mlkit:text-recognition-japanese", version.ref = "mlkitTextRecognitionChinese" }
 mlkit-text-recognition-korean = { module = "com.google.mlkit:text-recognition-korean", version.ref = "mlkitTextRecognitionChinese" }
 mlkit-text-recognition-latin = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitTextRecognitionChinese" }
+mlkit-text-recognition-devanagari = { module = "com.google.mlkit:text-recognition-devanagari", version.ref = "mlkitTextRecognitionChinese" }
 mlkit-translate = { module = "com.google.mlkit:translate", version.ref = "mlkitTranslate" }
 junit = { module = "junit:junit", version.ref = "junit" }
 

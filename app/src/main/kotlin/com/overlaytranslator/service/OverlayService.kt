@@ -73,6 +73,13 @@ class OverlayService(private val context: Context) {
         }
     }
 
+    /** Shows the audio subtitle band (bottom center). Safe to call from any thread. */
+    fun subtitle(text: String?) {
+        mainHandler.post {
+            obtainView().setSubtitle(text)
+        }
+    }
+
     /** Toggles the overlay invisible for [millis], then restores it. */
     fun hideTemporarily(millis: Long = 3000L) {
         mainHandler.post {

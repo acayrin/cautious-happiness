@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.mlkit.text.recognition.japanese)
     implementation(libs.mlkit.text.recognition.korean)
     implementation(libs.mlkit.text.recognition.latin)
+    implementation(libs.mlkit.text.recognition.devanagari)
     implementation(libs.mlkit.translate)
 
     testImplementation(libs.junit)

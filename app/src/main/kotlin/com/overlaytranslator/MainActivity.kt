@@ -7,6 +7,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
+import android.view.WindowInsets
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -70,6 +72,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modelUrlInput: android.widget.EditText
     private lateinit var languageSpinner: android.widget.Spinner
     private lateinit var backendSpinner: android.widget.Spinner
+    private lateinit var audioSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var audioQualitySpinner: android.widget.Spinner
 
     private var running = false
 
@@ -113,6 +117,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        applyWindowInsets()
 
         config = loadConfig()
         bindViews()
@@ -121,6 +126,19 @@ class MainActivity : AppCompatActivity() {
         refreshTouchSetupUi()
         refreshRunningUi()
         applyConfigToSliders()
+    }
+
+    /** Edge-to-edge is enforced at targetSdk 35: pad the settings screen clear
+     *  of the status bar / display cutout and the navigation bar, whatever
+     *  shape the device has. */
+    private fun applyWindowInsets() {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        findViewById<View>(R.id.settings_root).setOnApplyWindowInsetsListener { v, insets ->
+            val top = insets.getInsets(WindowInsets.Type.statusBars()).top
+            val bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+            v.setPadding(pad, top + pad, pad, bottom + pad)
+            insets
+        }
     }
 
     override fun onResume() {
@@ -187,6 +205,8 @@ class MainActivity : AppCompatActivity() {
         modelUrlInput.setText(config.modelBaseUrl)
         languageSpinner = findViewById(R.id.languageSpinner)
         backendSpinner = findViewById(R.id.backendSpinner)
+        audioSwitch = findViewById(R.id.audioSwitch)
+        audioQualitySpinner = findViewById(R.id.audioQualitySpinner)
     }
 
     private fun wireListeners() {
@@ -347,6 +367,23 @@ class MainActivity : AppCompatActivity() {
         normalizeSwitch.setOnCheckedChangeListener { _, checked ->
             config = config.copy(normalizeCacheKeys = checked)
             saveConfig()
+        }
+        audioSwitch.setOnCheckedChangeListener { _, checked ->
+            config = config.copy(audioEnabled = checked)
+            saveConfig()
+        }
+        audioQualitySpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: android.widget.AdapterView<*>?, view: android.view.View?,
+                position: Int, id: Long,
+            ) {
+                val code = resources.getStringArray(R.array.audio_quality_codes)[position]
+                if (code != config.audioQuality) {
+                    config = config.copy(audioQuality = code)
+                    saveConfig()
+                }
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
         modelUrlInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun afterTextChanged(editable: android.text.Editable) {
@@ -512,6 +549,9 @@ class MainActivity : AppCompatActivity() {
 
         overflowSwitch.isChecked = config.allowTextOverflow
         normalizeSwitch.isChecked = config.normalizeCacheKeys
+        audioSwitch.isChecked = config.audioEnabled
+        val qualities = resources.getStringArray(R.array.audio_quality_codes)
+        audioQualitySpinner.setSelection(qualities.indexOf(config.audioQuality).coerceAtLeast(0))
     }
 
     private fun currentLang(): String {
@@ -560,6 +600,10 @@ class MainActivity : AppCompatActivity() {
             clearAfterSeconds = p.getInt(OverlayConfig.KEY_CLEAR_AFTER, 2),
             allowTextOverflow = p.getBoolean(OverlayConfig.KEY_TEXT_OVERFLOW, false),
             normalizeCacheKeys = p.getBoolean(OverlayConfig.KEY_NORMALIZE_CACHE, false),
+            audioEnabled = p.getBoolean(OverlayConfig.KEY_AUDIO_ENABLED, false),
+            audioQuality = p.getString(
+                OverlayConfig.KEY_AUDIO_QUALITY, OverlayConfig.AUDIO_FAST,
+            ) ?: OverlayConfig.AUDIO_FAST,
         )
     }
 
@@ -578,6 +622,8 @@ class MainActivity : AppCompatActivity() {
             .putInt(OverlayConfig.KEY_CLEAR_AFTER, config.clearAfterSeconds)
             .putBoolean(OverlayConfig.KEY_TEXT_OVERFLOW, config.allowTextOverflow)
             .putBoolean(OverlayConfig.KEY_NORMALIZE_CACHE, config.normalizeCacheKeys)
+            .putBoolean(OverlayConfig.KEY_AUDIO_ENABLED, config.audioEnabled)
+            .putString(OverlayConfig.KEY_AUDIO_QUALITY, config.audioQuality)
             .apply()
     }
 

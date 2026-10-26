@@ -10,9 +10,10 @@ export PATH=$JAVA_HOME/bin:$PATH
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-Native build (only when C++ changes): `app/src/main/cpp/build-deps.sh`
-(fetches CTranslate2 v4.8.2 + sentencepiece v0.2.1, builds arm64 statics into
-`deps/build-ct2` / `deps/build-spm`, linked by `app/src/main/cpp/CMakeLists.txt`).
+Native build (only when C++ changes): `bash app/src/main/cpp/build-deps.sh`
+(fetchs CTranslate2 v4.8.2 + sentencepiece v0.2.1 + whisper.cpp, builds arm64
+statics into `deps/build-ct2` / `deps/build-spm` / `deps/build-whisper`, linked by
+`app/src/main/cpp/CMakeLists.txt`).
 
 ## Code conventions
 
@@ -47,6 +48,15 @@ Native build (only when C++ changes): `app/src/main/cpp/build-deps.sh`
   git-ignored — do not resurrect without a strong reason.
 - **OPUS-MT model hosting**: models are downloaded from the "Model base URL" setting,
   default `https://raw.githubusercontent.com/acayrin/cautious-happiness/main/models`.
+  Whisper models live under `<base>/whisper/` (ggml-tiny-q5_1 = fast default,
+  ggml-base-q5_1 = accurate). `Helsinki-NLP/opus-mt-pt-en` doesn't exist — the pt
+  folder is the converted `opus-mt-ROMANCE-en` (covers pt; don't "fix" the naming).
+- **Audio subtitles**: AudioPlaybackCapture rides on the SAME MediaProjection consent
+  (no RECORD_AUDIO, no extra VirtualDisplay). Apps with `allowAudioCapture=false` or
+  FLAG_SECURE are silent. whisper.cpp runs greedy/2 threads (leave CPU for OPUS-MT);
+  `SubtitleChunker` is the pure tumbling-window + RMS VAD gate (unit-tested). Audio
+  translation uses its own `TranslationChain` instance — the JNI `nativeTranslate`
+  has no locking.
 
 ## File layout
 
@@ -55,4 +65,5 @@ Native build (only when C++ changes): `app/src/main/cpp/build-deps.sh`
 - `translate/TranslatePipeline.kt` — orchestration; `Translator.kt` — chain + ML Kit; `RemoteTranslator.kt` — Google2; `OpusMtTranslator.kt` — JNI + model download
 - `overlay/TranslationView.kt` — painter; `overlay/OverlayConfig.kt` — settings model
 - `cache/TranslationCache.kt`, `cache/TranslationKeys.kt` — translation memory
-- `app/src/main/cpp/` — JNI shim (`opusmt_jni.cpp`) + CMake; `models/` — converted OPUS-MT models
+- `audio/` — `AudioSubtitleEngine.kt` (capture→chunk→transcribe→translate), `WhisperTranscriber.kt` (JNI + model download), `SubtitleChunker.kt` (pure)
+- `app/src/main/cpp/` — JNI shims (`opusmt_jni.cpp`, `whisper_jni.cpp`) + CMake; `models/` — converted OPUS-MT models + whisper ggml models

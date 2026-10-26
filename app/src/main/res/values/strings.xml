@@ -94,6 +94,16 @@
         <item>French</item>
         <item>Spanish</item>
         <item>Vietnamese</item>
+        <item>German</item>
+        <item>Italian</item>
+        <item>Portuguese</item>
+        <item>Dutch</item>
+        <item>Polish</item>
+        <item>Swedish</item>
+        <item>Turkish</item>
+        <item>Indonesian</item>
+        <item>Hindi</item>
+        <item>Czech</item>
     </string-array>
     <string-array name="source_language_codes">
         <item>zh</item>
@@ -102,6 +112,16 @@
         <item>fr</item>
         <item>es</item>
         <item>vi</item>
+        <item>de</item>
+        <item>it</item>
+        <item>pt</item>
+        <item>nl</item>
+        <item>pl</item>
+        <item>sv</item>
+        <item>tr</item>
+        <item>id</item>
+        <item>hi</item>
+        <item>cs</item>
     </string-array>
     <string-array name="backend_labels">
         <item>OPUS-MT (offline, recommended)</item>
@@ -114,6 +134,20 @@
         <item>auto</item>
         <item>google2</item>
         <item>local</item>
+    </string-array>
+
+    <!-- Audio subtitles -->
+    <string name="settings_audio">Audio subtitles</string>
+    <string name="settings_audio_desc">Transcribe the captured app\'s audio (voice lines) and show the English translation as a subtitle. Secure apps and apps that block audio capture produce silence. Background music reduces accuracy. Applies when capture restarts.</string>
+    <string name="settings_audio_quality">Transcription quality</string>
+    <string name="settings_audio_quality_desc">Fast is the default (small model, lowest delay). Accurate is slower and downloads a bigger model. Applies when capture restarts.</string>
+    <string-array name="audio_quality_labels">
+        <item>Fast (recommended)</item>
+        <item>Accurate</item>
+    </string-array>
+    <string-array name="audio_quality_codes">
+        <item>fast</item>
+        <item>accurate</item>
     </string-array>
 
     <!-- Glossary -->

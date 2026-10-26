@@ -34,4 +34,15 @@ $CMAKE -S ctranslate2 -B build-ct2 -G Ninja -DCMAKE_MAKE_PROGRAM=$NINJA \
 $NINJA -C build-ct2
 test -f build-ct2/libctranslate2.a
 
+# whisper.cpp (speech-to-text for the subtitle feature)
+[ -d whisper.cpp ] || git clone --depth 1 https://github.com/ggml-org/whisper.cpp whisper.cpp
+$CMAKE -S whisper.cpp -B build-whisper -G Ninja -DCMAKE_MAKE_PROGRAM=$NINJA \
+  -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+  -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-30 \
+  -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+  -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=OFF \
+  -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF
+$NINJA -C build-whisper
+test -f build-whisper/src/libwhisper.a
+
 echo "deps OK"
