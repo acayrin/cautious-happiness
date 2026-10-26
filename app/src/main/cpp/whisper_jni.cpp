@@ -51,11 +51,16 @@ jstring nativeTranscribe(JNIEnv* env, jclass, jlong handle, jfloatArray samples)
     return nullptr;
 
   std::string out;
+  bool speech = false;
   const int nseg = whisper_full_n_segments(asr->ctx);
   for (int i = 0; i < nseg; ++i) {
+    // Music/silence windows make whisper hallucinate text; treat segments it
+    // itself flags as "no speech" as an empty result (feeds the engine backoff).
+    if (whisper_full_get_segment_no_speech_prob(asr->ctx, i) <= 0.6f) speech = true;
     const char* t = whisper_full_get_segment_text(asr->ctx, i);
     if (t != nullptr) out += t;
   }
+  if (!speech) return nullptr;
   const size_t b = out.find_first_not_of(" \t\n\r");
   if (b == std::string::npos) return nullptr;
   const size_t e = out.find_last_not_of(" \t\n\r");

@@ -143,6 +143,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // The activity gets recreated while capture runs — the service is the
+        // only source of truth for the start/stop button.
+        running = CaptureService.isRunning
         refreshPermissionUi()
         refreshTouchSetupUi()
         refreshRunningUi()
@@ -452,7 +455,7 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------------- state
 
     private fun toggleService() {
-        if (running) {
+        if (CaptureService.isRunning) {
             CaptureService.stop(this)
             running = false
             refreshRunningUi()

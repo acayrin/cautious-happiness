@@ -19,12 +19,15 @@ class FrameDiffGate(
      * On first call always returns true.
      */
     @Synchronized
-    fun shouldProcess(bitmap: Bitmap): Boolean {
-        val cur = lumaGrid(bitmap)
+    fun shouldProcess(bitmap: Bitmap): Boolean = shouldProcess(lumaGrid(bitmap))
+
+    /** Pure-ish overload: [luma] is a fresh GRID*GRID grid sampled from the frame. */
+    @Synchronized
+    fun shouldProcess(luma: IntArray): Boolean {
         val last = lastLuma
-        lastLuma = cur
+        lastLuma = luma
         if (last == null) return true
-        return countChanged(last, cur, CELL_LUMA_DELTA) >= minChangedCells
+        return countChanged(last, luma, CELL_LUMA_DELTA) >= minChangedCells
     }
 
     @Synchronized
@@ -48,6 +51,31 @@ class FrameDiffGate(
             scaled.getPixels(pixels, 0, GRID, 0, 0, GRID, GRID)
             if (scaled != bitmap) scaled.recycle()
             return luma(pixels)
+        }
+
+        /**
+         * 32x32 luma grid sampled straight from an RGBA_8888 frame plane —
+         * no Bitmap allocation and no full-frame copy. Stride-aware, JVM-testable.
+         */
+        fun lumaGridRgba(
+            buffer: java.nio.ByteBuffer,
+            width: Int,
+            height: Int,
+            rowStride: Int,
+            pixelStride: Int,
+        ): IntArray {
+            val grid = IntArray(GRID * GRID)
+            for (gy in 0 until GRID) {
+                val row = (gy * height / GRID) * rowStride
+                for (gx in 0 until GRID) {
+                    val i = row + (gx * width / GRID) * pixelStride
+                    val r = buffer.get(i).toInt() and 0xFF
+                    val g = buffer.get(i + 1).toInt() and 0xFF
+                    val b = buffer.get(i + 2).toInt() and 0xFF
+                    grid[gy * GRID + gx] = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
+                }
+            }
+            return grid
         }
 
         /** Pure-logic: number of cells whose luma differs by more than [cellDelta]. */

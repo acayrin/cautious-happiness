@@ -6,6 +6,8 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** JNI bindings to the CTranslate2 + SentencePiece shim (libopusmt.so). */
@@ -36,6 +38,10 @@ class OpusMtTranslator(
     private val appContext = context.applicationContext
     private var handle = 0L
 
+    // One instance may be shared by the OCR pipeline and the subtitle engine;
+    // the JNI layer has no locking, so serialize translate calls.
+    private val lock = Mutex()
+
     private fun ensureHandle(): Long {
         if (handle != 0L) return handle
         val dir = modelDir(appContext, sourceLanguage).takeIf { isReady(appContext, sourceLanguage) }
@@ -49,7 +55,7 @@ class OpusMtTranslator(
         return handle
     }
 
-    override suspend fun translateAll(texts: List<String>): List<String?> =
+    override suspend fun translateAll(texts: List<String>): List<String?> = lock.withLock {
         withContext(Dispatchers.Default) {
             if (texts.isEmpty()) return@withContext emptyList()
             var h = ensureHandle()
@@ -63,6 +69,7 @@ class OpusMtTranslator(
             val out = OpusMtNative.nativeTranslate(h, texts.toTypedArray())
             if (out == null) texts.map { null } else texts.indices.map { out.getOrNull(it) }
         }
+    }
 
     override fun close() {
         if (handle != 0L) {

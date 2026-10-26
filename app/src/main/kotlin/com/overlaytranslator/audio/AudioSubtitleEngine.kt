@@ -49,6 +49,10 @@ class AudioSubtitleEngine(
     @Volatile
     private var cleared = true
 
+    /** Windows to skip before the next transcription (see transcribeLoop). */
+    @Volatile
+    private var skipWindows = 0
+
     /** Downloads the model if needed, then starts capture + transcription. */
     fun start(projection: MediaProjection, language: String, quality: String, baseUrl: String) {
         stop()
@@ -69,15 +73,22 @@ class AudioSubtitleEngine(
     fun stop() {
         running = false
         runCatching { windows.close() }
-        runCatching { captureThread?.join(1000) }
+        // Teardown may wait on an in-flight transcription — never do that on the
+        // caller (service main) thread or every capture restart ANRs the UI.
+        val t = captureThread
         captureThread = null
-        whisper?.close()
+        val w = whisper
         whisper = null
+        Thread {
+            runCatching { t?.join(2000) }
+            w?.close()
+        }.start()
     }
 
     // ------------------------------------------------------------ capture
 
     private fun captureLoop(projection: MediaProjection) {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
         val config = AudioPlaybackCaptureConfiguration.Builder(projection)
             .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
             .addMatchingUsage(AudioAttributes.USAGE_GAME)
@@ -144,9 +155,19 @@ class AudioSubtitleEngine(
     private suspend fun transcribeLoop() {
         for (window in windows) {
             if (!running) break
+            // Silence/music-only windows back the loop off exponentially (up to
+            // 4 windows ≈ 16 s) so background music doesn't keep whisper — and
+            // the CPU — busy forever. Real text resets the backoff to full rate.
+            if (skipWindows > 0) {
+                skipWindows--
+                continue
+            }
             val w = whisper ?: break
-            val text = runCatching { w.transcribe(window) }.getOrNull() ?: continue
-            if (text.isBlank()) continue
+            val text = runCatching { w.transcribe(window) }.getOrNull()
+            if (text.isNullOrBlank()) {
+                skipWindows = minOf(skipWindows * 2 + 1, 4)
+                continue
+            }
             val key = TranslationKeys.sourceHash(text, normalizeCache)
             val translated = cache.get(key)
                 ?: runCatching { translator.translateAll(listOf(text))[0] }.getOrNull()
@@ -154,12 +175,12 @@ class AudioSubtitleEngine(
                 ?: text
             lastEmitMillis = SystemClock.elapsedRealtime()
             cleared = false
-            onSubtitle(translated)
+            if (running) onSubtitle(translated)
         }
     }
 
     private fun expireIfNeeded() {
-        if (cleared) return
+        if (cleared || !running) return
         if (SystemClock.elapsedRealtime() - lastEmitMillis > clearAfterSeconds * 1000L) {
             cleared = true
             onCleared()

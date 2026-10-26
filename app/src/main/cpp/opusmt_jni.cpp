@@ -14,8 +14,17 @@ struct Engine {
   sentencepiece::SentencePieceProcessor src;
   sentencepiece::SentencePieceProcessor tgt;
 
+  static ctranslate2::ReplicaPoolConfig poolConfig() {
+    // 2 threads: greedy short lines don't scale past that; the default
+    // (CPU count) churns a full worker pool every 500 ms tick.
+    ctranslate2::ReplicaPoolConfig config;
+    config.num_threads_per_replica = 2;
+    return config;
+  }
+
   Engine(const std::string& model_dir, const std::string& src_spm, const std::string& tgt_spm)
-    : translator(model_dir, ctranslate2::Device::CPU)
+    : translator(model_dir, ctranslate2::Device::CPU, ctranslate2::ComputeType::DEFAULT,
+                 /*device_indices=*/{0}, /*tensor_parallel=*/false, poolConfig())
   {
     if (!src.Load(src_spm).ok() || !tgt.Load(tgt_spm).ok())
       throw std::runtime_error("failed to load sentencepiece models");

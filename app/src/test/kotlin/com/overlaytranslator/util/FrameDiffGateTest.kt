@@ -132,4 +132,37 @@ class FrameDiffGateTest {
         org.junit.Assert.fail(message)
         throw AssertionError(message)
     }
+
+    @Test
+    fun lumaGridRgbaSamplesStridedPlane() {
+        // 64x64 RGBA, left half red, right half blue.
+        val w = 64
+        val h = 64
+        val buf = java.nio.ByteBuffer.allocate(w * h * 4)
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val red = x < w / 2
+                buf.put(if (red) 0xFF.toByte() else 0) // R
+                buf.put(0) // G
+                buf.put(if (red) 0 else 0xFF.toByte()) // B
+                buf.put(0xFF.toByte()) // A
+            }
+        }
+        buf.position(0)
+        val grid = FrameDiffGate.lumaGridRgba(buf, w, h, w * 4, 4)
+        assertEquals(32 * 32, grid.size)
+        assertEquals(76, grid[0]) // 0.299*255
+        assertEquals(29, grid[31]) // 0.114*255
+    }
+
+    @Test
+    fun shouldProcessOnPrecomputedGrids() {
+        val gate = FrameDiffGate(minChangedCells = 6)
+        val a = IntArray(32 * 32) { 100 }
+        val b = IntArray(32 * 32) { 100 }
+        val changed = IntArray(32 * 32) { 200 }
+        assertTrue(gate.shouldProcess(a)) // first frame always processes
+        assertFalse(gate.shouldProcess(b)) // identical grid is skipped
+        assertTrue(gate.shouldProcess(changed)) // fully different grid processes
+    }
 }

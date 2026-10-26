@@ -65,6 +65,12 @@ class CaptureService : Service() {
 
         private const val NOTIFICATION_ID = 42
 
+        /** True while a capture pipeline is live. UI state must derive from this,
+         *  not from the activity's own field (activities get recreated). */
+        @Volatile
+        var isRunning = false
+            private set
+
         fun start(context: Context, resultCode: Int, resultData: Intent) {
             val intent = Intent(context, CaptureService::class.java).apply {
                 action = ACTION_START
@@ -92,6 +98,7 @@ class CaptureService : Service() {
 
     private var captureThread: HandlerThread? = null
     private var captureHandler: Handler? = null
+    private var projectionCallback: MediaProjection.Callback? = null
     private var frameGate = FrameDiffGate()
     private var lastTickMillis = 0L
     private var framesSeen = 0
@@ -158,6 +165,7 @@ class CaptureService : Service() {
     private var sourceLang: String = OverlayConfig.LANG_ZH
     private var backendCode: String = OverlayConfig.BACKEND_OPUSMT
     private var subtitleEngine: AudioSubtitleEngine? = null
+    private lateinit var sharedTranslator: TranslationChain
 
     private fun loadConfig(): OverlayConfig {
         val p = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
@@ -207,6 +215,7 @@ class CaptureService : Service() {
             .getString(OverlayConfig.KEY_BACKEND, OverlayConfig.BACKEND_OPUSMT) ?: OverlayConfig.BACKEND_OPUSMT
         val offline = OpusMtTranslator(this, sourceLang, config.modelBaseUrl)
         val translator = TranslationChain(sourceLang, localTranslator, backendCode, offline)
+        sharedTranslator = translator
         scope.launch {
             Log.i(TAG, "Translation model ($sourceLang→en) downloaded=${localTranslator.ensureModelDownloaded()}")
         }
@@ -242,6 +251,12 @@ class CaptureService : Service() {
                     Log.e(TAG, "Missing projection consent; refusing to start")
                     stopSelf()
                     return START_NOT_STICKY
+                }
+                if (isRunning) {
+                    // A stale "Start" tap must restart, never stack a second
+                    // pipeline (two overlay windows kill all touch input).
+                    Log.i(TAG, "Capture already running — restarting with new projection")
+                    stopCapture()
                 }
                 startForegroundWithNotification()
                 startCapture(resultCode, resultData)
@@ -292,6 +307,7 @@ class CaptureService : Service() {
     }
 
     private fun startCapture(resultCode: Int, resultData: Intent) {
+        overlay.activate()
         val projectionManager =
             getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
@@ -307,16 +323,20 @@ class CaptureService : Service() {
 
         projection.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
+                // Fires also when WE stop an old projection during a restart —
+                // only a user-initiated stop may tear everything down.
+                if (mediaProjection !== projection) return
                 Log.i(TAG, "MediaProjection stopped by user")
                 stopCapture()
                 stopSelf()
             }
-        }, captureHandler)
+        }.also { projectionCallback = it }, captureHandler)
 
         displayManager.registerDisplayListener(displayListener, captureHandler)
         ensureCaptureSurfaces()
         captureHandler?.post(healTick)
         startSubtitles(projection)
+        isRunning = true
         Log.i(TAG, "Capture started${if (imageReader != null) " at ${screenWidth}x$screenHeight" else ": waiting for landscape"}")
     }
 
@@ -325,12 +345,10 @@ class CaptureService : Service() {
         if (!config.audioEnabled) return
         subtitleEngine = AudioSubtitleEngine(
             context = this,
-            translator = TranslationChain(
-                sourceLang,
-                Translator(sourceLang),
-                backendCode,
-                OpusMtTranslator(this, sourceLang, config.modelBaseUrl),
-            ),
+            // Shared chain (mutex-serialized): a second translator instance
+            // would load a whole extra OPUS-MT model into RAM — on a device at
+            // its memory limit that gets the game killed by the system cleaner.
+            translator = sharedTranslator,
             cache = TranslationCache.get(this),
             normalizeCache = config.normalizeCacheKeys,
             clearAfterSeconds = config.clearAfterSeconds,
@@ -343,6 +361,7 @@ class CaptureService : Service() {
     }
 
     private fun stopCapture() {
+        isRunning = false
         subtitleEngine?.stop()
         subtitleEngine = null
         runCatching { displayManager.unregisterDisplayListener(displayListener) }
@@ -355,6 +374,8 @@ class CaptureService : Service() {
         virtualDisplay = null
         runCatching { imageReader?.close() }
         imageReader = null
+        projectionCallback?.let { cb -> runCatching { mediaProjection?.unregisterCallback(cb) } }
+        projectionCallback = null
         runCatching { mediaProjection?.stop() }
         mediaProjection = null
 
@@ -420,6 +441,28 @@ class CaptureService : Service() {
      * the translation pipeline.
      */
     private fun processImage(image: Image) {
+        // Gate first on a tiny grid sampled from the plane: converting every
+        // frame to a Bitmap just to diff it burns a full-frame copy per tick.
+        val changed = try {
+            val plane = image.planes[0]
+            frameGate.shouldProcess(
+                FrameDiffGate.lumaGridRgba(
+                    plane.buffer, image.width, image.height,
+                    plane.rowStride, plane.pixelStride,
+                ),
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "Frame gate failed", t)
+            true
+        }
+        if (!changed && ++skippedFrames < config.forceEvery) {
+            Log.d(TAG, "Frame skipped (unchanged)")
+            overlay.status("skipped (unchanged)")
+            image.close()
+            return
+        }
+        skippedFrames = 0
+
         val bitmap: Bitmap? = try {
             imageToBitmap(image)
         } catch (t: Throwable) {
@@ -429,16 +472,7 @@ class CaptureService : Service() {
             image.close()
         }
 
-        val frame = bitmap ?: return
-        val changed = frameGate.shouldProcess(frame)
-        if (!changed && ++skippedFrames < config.forceEvery) {
-            Log.d(TAG, "Frame skipped (unchanged)")
-            overlay.status("skipped (unchanged)")
-            frame.recycle()
-            return
-        }
-        skippedFrames = 0
-        submitFrame(frame)
+        bitmap?.let { submitFrame(it) }
     }
 
     /**

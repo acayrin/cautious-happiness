@@ -28,6 +28,11 @@ class OverlayService(private val context: Context) {
     private var pokeFlip = false
     private var allowOverflow = false
 
+    /** Every window this instance actually attached; destroy() removes them all.
+     *  A leaked overlay window is fatal: two stacked untrusted windows make
+     *  Android 12+ drop ALL touch input to the whole screen. */
+    private val attachedViews = mutableListOf<View>()
+
     /** Text may extend beyond the OCR box (applies to new bindings). */
     fun setAllowOverflow(value: Boolean) {
         mainHandler.post {
@@ -39,9 +44,19 @@ class OverlayService(private val context: Context) {
     @Volatile
     private var hidden = false
 
+    /** Only the active capture may create windows. Late posts from a stopped
+     *  engine/capture loop must never resurrect a destroyed overlay. */
+    @Volatile
+    private var active = false
+
+    fun activate() {
+        active = true
+    }
+
     /** Replaces the visible set of translations. Safe to call from any thread. */
     fun update(blocks: List<RenderedBlock>, backgroundAlpha: Int) {
         mainHandler.post {
+            if (!active) return@post
             val v = obtainView()
             v.bind(blocks, backgroundAlpha)
             v.alpha = if (hidden) 0f else 1f
@@ -55,10 +70,13 @@ class OverlayService(private val context: Context) {
      */
     fun poke() {
         mainHandler.post {
+            if (!active) return@post
             pokeFlip = !pokeFlip
-            val view = pokeView ?: View(context).also {
-                pokeView = it
-                runCatching { wm.addView(it, pokeParams()) }
+            val view = pokeView ?: View(context).also { pv ->
+                pokeView = pv
+                runCatching { wm.addView(pv, pokeParams()) }
+                    .onSuccess { attachedViews += pv }
+                    .onFailure { pokeView = null }
             }
             val lp = view.layoutParams as? WindowManager.LayoutParams ?: return@post
             lp.x = if (pokeFlip) 0 else 1
@@ -69,6 +87,7 @@ class OverlayService(private val context: Context) {
     /** Shows a status line (top-right chip). Safe to call from any thread. */
     fun status(text: String) {
         mainHandler.post {
+            if (!active) return@post
             obtainView().setStatus(text)
         }
     }
@@ -76,6 +95,7 @@ class OverlayService(private val context: Context) {
     /** Shows the audio subtitle band (bottom center). Safe to call from any thread. */
     fun subtitle(text: String?) {
         mainHandler.post {
+            if (!active) return@post
             obtainView().setSubtitle(text)
         }
     }
@@ -83,6 +103,7 @@ class OverlayService(private val context: Context) {
     /** Toggles the overlay invisible for [millis], then restores it. */
     fun hideTemporarily(millis: Long = 3000L) {
         mainHandler.post {
+            if (!active) return@post
             hidden = true
             view?.alpha = 0f
             mainHandler.postDelayed({
@@ -94,9 +115,10 @@ class OverlayService(private val context: Context) {
 
     fun destroy() {
         mainHandler.post {
-            view?.let { runCatching { wm.removeViewImmediate(it) } }
+            active = false
+            for (v in attachedViews) runCatching { wm.removeViewImmediate(v) }
+            attachedViews.clear()
             view = null
-            pokeView?.let { runCatching { wm.removeViewImmediate(it) } }
             pokeView = null
         }
     }
@@ -106,6 +128,8 @@ class OverlayService(private val context: Context) {
         val created = TranslationView(context).apply { allowOverflow = this@OverlayService.allowOverflow }
         view = created
         runCatching { wm.addView(created, windowParams()) }
+            .onSuccess { attachedViews += created }
+            .onFailure { view = null }
         return created
     }
 
