@@ -38,12 +38,12 @@ class WhisperTranscriber(
         if (it == 0L) Log.w(TAG, "whisper init failed for '$language' ($quality)")
     }
 
-    fun transcribe(samples: FloatArray): String? {
-        if (handle == 0L) return null
-        return WhisperNative.nativeTranscribe(handle, samples)?.trim()?.takeIf { it.isNotEmpty() }
+    fun transcribe(samples: FloatArray): String? = synchronized(this) {
+        if (handle == 0L) return@synchronized null
+        WhisperNative.nativeTranscribe(handle, samples)?.trim()?.takeIf { it.isNotEmpty() }
     }
 
-    fun close() {
+    fun close() = synchronized(this) {
         if (handle != 0L) {
             WhisperNative.nativeDestroy(handle)
             handle = 0L

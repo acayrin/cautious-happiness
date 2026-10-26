@@ -41,7 +41,7 @@ class AudioSubtitleEngine(
     private var captureThread: Thread? = null
     private var whisper: WhisperTranscriber? = null
 
-    private val windows = Channel<FloatArray>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private var windows = Channel<FloatArray>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     @Volatile
     private var lastEmitMillis = 0L
@@ -52,6 +52,7 @@ class AudioSubtitleEngine(
     /** Downloads the model if needed, then starts capture + transcription. */
     fun start(projection: MediaProjection, language: String, quality: String, baseUrl: String) {
         stop()
+        windows = Channel(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
         running = true
         scope.launch {
             if (!WhisperTranscriber.ensureModel(appContext, quality, baseUrl)) {
@@ -67,6 +68,7 @@ class AudioSubtitleEngine(
 
     fun stop() {
         running = false
+        runCatching { windows.close() }
         runCatching { captureThread?.join(1000) }
         captureThread = null
         whisper?.close()
