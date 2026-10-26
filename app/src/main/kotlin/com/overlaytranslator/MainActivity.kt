@@ -81,6 +81,22 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { refreshPermissionUi() }
 
+    private val exportSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { exportSettings(it) } }
+
+    private val importSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { importSettings(it) } }
+
+    private val exportCacheLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { exportCache(it) } }
+
+    private val importCacheLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { importCache(it) } }
+
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -373,6 +389,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.glossaryButton).setOnClickListener {
             startActivity(Intent(this, GlossaryActivity::class.java))
         }
+        findViewById<MaterialButton>(R.id.exportSettingsButton).setOnClickListener {
+            exportSettingsLauncher.launch("overlay-translator-settings.json")
+        }
+        findViewById<MaterialButton>(R.id.importSettingsButton).setOnClickListener {
+            importSettingsLauncher.launch(arrayOf("application/json", "text/plain"))
+        }
+        findViewById<MaterialButton>(R.id.exportCacheButton).setOnClickListener {
+            exportCacheLauncher.launch("overlay-translator-cache.json")
+        }
+        findViewById<MaterialButton>(R.id.importCacheButton).setOnClickListener {
+            importCacheLauncher.launch(arrayOf("application/json", "text/plain"))
+        }
         findViewById<MaterialButton>(R.id.clearCacheButton).setOnClickListener {
             lifecycleScope.launch {
                 withContext(Dispatchers.IO) {
@@ -551,6 +579,138 @@ class MainActivity : AppCompatActivity() {
             .putBoolean(OverlayConfig.KEY_TEXT_OVERFLOW, config.allowTextOverflow)
             .putBoolean(OverlayConfig.KEY_NORMALIZE_CACHE, config.normalizeCacheKeys)
             .apply()
+    }
+
+    // ------------------------------------------------------- settings/cache io
+
+    private fun exportSettings(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val root = org.json.JSONObject().put("version", 1)
+                    for ((prefsName, sectionName) in listOf(
+                        OverlayConfig.PREFS_NAME to "overlay_config",
+                        "glossary" to "glossary",
+                    )) {
+                        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+                        val section = org.json.JSONObject()
+                        for ((k, v) in prefs.all) {
+                            val typed = org.json.JSONObject()
+                            when (v) {
+                                is Boolean -> typed.put("t", "b").put("v", v)
+                                is Int -> typed.put("t", "i").put("v", v)
+                                is Long -> typed.put("t", "l").put("v", v)
+                                is Float -> typed.put("t", "f").put("v", v.toDouble())
+                                else -> typed.put("t", "s").put("v", v.toString())
+                            }
+                            section.put(k, typed)
+                        }
+                        root.put(sectionName, section)
+                    }
+                    contentResolver.openOutputStream(uri)?.use {
+                        it.write(root.toString().toByteArray(Charsets.UTF_8))
+                    } ?: error("no output stream")
+                }.isSuccess
+            }
+            Toast.makeText(
+                this@MainActivity,
+                if (ok) R.string.export_ok else R.string.export_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    private fun importSettings(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = contentResolver.openInputStream(uri)?.bufferedReader()
+                        ?.use { it.readText() } ?: error("no input stream")
+                    val root = org.json.JSONObject(text)
+                    for ((prefsName, sectionName) in listOf(
+                        OverlayConfig.PREFS_NAME to "overlay_config",
+                        "glossary" to "glossary",
+                    )) {
+                        val section = root.optJSONObject(sectionName) ?: continue
+                        val editor = getSharedPreferences(prefsName, Context.MODE_PRIVATE).edit()
+                        for (k in section.keys()) {
+                            val typed = section.getJSONObject(k)
+                            val v = typed.get("v")
+                            when (typed.optString("t", "s")) {
+                                "b" -> editor.putBoolean(k, v as Boolean)
+                                "i" -> editor.putInt(k, (v as Number).toInt())
+                                "l" -> editor.putLong(k, (v as Number).toLong())
+                                "f" -> editor.putFloat(k, (v as Number).toFloat())
+                                else -> editor.putString(k, v.toString())
+                            }
+                        }
+                        editor.apply()
+                    }
+                }.isSuccess
+            }
+            if (ok) {
+                config = loadConfig()
+                applyConfigToSliders()
+            }
+            Toast.makeText(
+                this@MainActivity,
+                if (ok) R.string.import_ok else R.string.import_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    private fun exportCache(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val entries = com.overlaytranslator.cache.TranslationCache.get(this@MainActivity)
+                        .allEntries()
+                    val array = org.json.JSONArray()
+                    for ((source, translated) in entries) {
+                        array.put(org.json.JSONObject().put("s", source).put("t", translated))
+                    }
+                    contentResolver.openOutputStream(uri)?.use {
+                        it.write(array.toString().toByteArray(Charsets.UTF_8))
+                    } ?: error("no output stream")
+                }.isSuccess
+            }
+            Toast.makeText(
+                this@MainActivity,
+                if (ok) R.string.export_ok else R.string.export_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    private fun importCache(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = contentResolver.openInputStream(uri)?.bufferedReader()
+                        ?.use { it.readText() } ?: error("no input stream")
+                    val array = org.json.JSONArray(text)
+                    val cache = com.overlaytranslator.cache.TranslationCache.get(this@MainActivity)
+                    val normalize = config.normalizeCacheKeys
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        val source = obj.getString("s")
+                        val translated = obj.getString("t")
+                        cache.put(
+                            com.overlaytranslator.cache.TranslationKeys.sourceHash(source, normalize),
+                            source,
+                            translated,
+                        )
+                    }
+                }.isSuccess
+            }
+            if (ok) refreshCacheSize()
+            Toast.makeText(
+                this@MainActivity,
+                if (ok) R.string.import_cache_ok else R.string.import_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     // ---------------------------------------------------------------- model

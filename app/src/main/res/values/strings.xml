@@ -57,6 +57,15 @@
     <string name="settings_normalize_cache">Normalize cache lookups</string>
     <string name="settings_normalize_cache_desc">Ignores punctuation, symbols, line breaks and full-/half-width differences when looking up cached translations, so near-identical OCR text reuses one translation instead of creating duplicates. Applies when capture restarts.</string>
     <string name="cache_size_label">Cache size</string>
+    <string name="btn_export_settings">Export settings</string>
+    <string name="btn_import_settings">Import settings</string>
+    <string name="btn_export_cache">Export cache</string>
+    <string name="btn_import_cache">Import cache</string>
+    <string name="export_ok">Exported</string>
+    <string name="export_failed">Export failed</string>
+    <string name="import_ok">Imported — applies when capture restarts</string>
+    <string name="import_failed">Import failed</string>
+    <string name="import_cache_ok">Cache import finished</string>
     <string name="cache_size_value">Cache size: %1$s</string>
     <string name="settings_fps_value">%1$d ms</string>
     <string name="settings_opacity_value">%1$d%%</string>

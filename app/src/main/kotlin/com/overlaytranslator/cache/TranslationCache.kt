@@ -65,6 +65,18 @@ class TranslationCache private constructor(context: Context) :
         )
     }
 
+    /** All entries as (sourceText, translated) pairs, most recent first. */
+    fun allEntries(): List<Pair<String, String>> {
+        readableDatabase.rawQuery(
+            "SELECT source_text, translated FROM translations ORDER BY updated_at DESC",
+            null,
+        ).use { c ->
+            val out = ArrayList<Pair<String, String>>(c.count)
+            while (c.moveToNext()) out.add(c.getString(0) to c.getString(1))
+            return out
+        }
+    }
+
     fun clear() {
         writableDatabase.execSQL("DELETE FROM translations")
     }
