@@ -1,0 +1,24 @@
+ja-hplt-en — Japanese → English
+================================
+
+Weights converted/published by WindyTranslate (Windstorm Labs):
+  https://huggingface.co/WindyTranslate/translate-windy-hplt-ja-en
+
+Derived from the HPLT project (Horizon Europe grant No 101070350):
+  HPLT/translate-ja-en-v2.0-hplt_opus
+  https://huggingface.co/HPLT/translate-ja-en-v2.0-hplt_opus
+  "An Expanded Massive Multilingual Dataset for High-Performance Language
+   Technologies", arXiv:2503.10267
+
+License: CC-BY-4.0 (attribution required, see LICENSE terms at the links above).
+This directory redistributes the model under the same license.
+
+Local change made here: config.json sets
+  "decoder_start_token": "<s>"   (upstream shipped "</s>")
+  "add_source_eos": true         (upstream shipped false)
+Without both, CTranslate2 output degenerates into repetition loops. The
+vocabulary has no "<pad>" token, so the usual OPUS-MT "<pad>" setting cannot be
+used for this model.
+
+Verified artifact: model.bin sha256
+  b19638fea3390bffae7a9382e13320b15c443d6ec8a0fd256b86b18461ecee18

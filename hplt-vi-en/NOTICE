@@ -1,0 +1,19 @@
+hplt-vi-en — Vietnamese → English
+================================
+
+Derived from the HPLT project (Horizon Europe grant No 101070350):
+  HPLT/translate-vi-en-v2.0-hplt_opus
+  https://huggingface.co/HPLT/translate-vi-en-v2.0-hplt_opus
+  "An Expanded Massive Multilingual Dataset for High-Performance Language
+   Technologies", arXiv:2503.10267
+
+License: CC-BY-4.0 (attribution required). Redistributed under the same license.
+
+Converted here from the native Marian release (model.npz.best-chrf.npz +
+model.vi-en.spm) with ctranslate2's Marian converter to int8, because HPLT does
+not publish a CTranslate2 build.
+
+config.json sets:
+  "decoder_start_token": "<s>"
+  "add_source_eos": true
+Without both, CTranslate2 output degenerates into repetition loops.
