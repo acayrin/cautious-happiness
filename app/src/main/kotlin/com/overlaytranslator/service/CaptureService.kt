@@ -194,6 +194,9 @@ class CaptureService : Service() {
             audioQuality = p.getString(
                 OverlayConfig.KEY_AUDIO_QUALITY, OverlayConfig.AUDIO_FAST,
             ) ?: OverlayConfig.AUDIO_FAST,
+            jaModel = p.getString(
+                OverlayConfig.KEY_JA_MODEL, OverlayConfig.JA_HPLT,
+            )?.takeIf { it.isNotBlank() } ?: OverlayConfig.JA_HPLT,
         )
     }
 
@@ -213,7 +216,7 @@ class CaptureService : Service() {
         val localTranslator = Translator(sourceLang)
         backendCode = getSharedPreferences(OverlayConfig.PREFS_NAME, MODE_PRIVATE)
             .getString(OverlayConfig.KEY_BACKEND, OverlayConfig.BACKEND_OPUSMT) ?: OverlayConfig.BACKEND_OPUSMT
-        val offline = OpusMtTranslator(this, sourceLang, config.modelBaseUrl)
+        val offline = OpusMtTranslator(this, sourceLang, config.modelBaseUrl, config.jaModel)
         val translator = TranslationChain(sourceLang, localTranslator, backendCode, offline)
         sharedTranslator = translator
         scope.launch {
@@ -233,7 +236,9 @@ class CaptureService : Service() {
         )
         // Fetch the offline translation model in the background when missing.
         scope.launch {
-            OpusMtTranslator.ensureModel(this@CaptureService, sourceLang, config.modelBaseUrl)
+            OpusMtTranslator.ensureModel(
+                this@CaptureService, sourceLang, config.modelBaseUrl, config.jaModel,
+            )
         }
         // Warm up the OCR model so the first real frame doesn't pay its load time.
         scope.launch {

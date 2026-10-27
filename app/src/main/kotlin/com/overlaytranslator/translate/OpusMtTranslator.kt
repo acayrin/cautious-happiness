@@ -2,6 +2,7 @@ package com.overlaytranslator.translate
 
 import android.content.Context
 import android.util.Log
+import com.overlaytranslator.overlay.OverlayConfig
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,6 +34,8 @@ class OpusMtTranslator(
     context: Context,
     private val sourceLanguage: String,
     private val baseUrl: String,
+    /** Japanese only: ja-hplt-en (better on game lines) or the Helsinki pair. */
+    private val jaModel: String = OverlayConfig.JA_HPLT,
 ) : TextTranslator {
 
     private val appContext = context.applicationContext
@@ -44,8 +47,8 @@ class OpusMtTranslator(
 
     private fun ensureHandle(): Long {
         if (handle != 0L) return handle
-        val dir = modelDir(appContext, sourceLanguage).takeIf { isReady(appContext, sourceLanguage) }
-            ?: return 0L
+        val dir = modelDir(appContext, sourceLanguage, jaModel)
+            .takeIf { File(it, "ready").exists() } ?: return 0L
         handle = OpusMtNative.nativeCreate(
             dir.absolutePath,
             File(dir, "source.spm").absolutePath,
@@ -60,7 +63,7 @@ class OpusMtTranslator(
             if (texts.isEmpty()) return@withContext emptyList()
             var h = ensureHandle()
             if (h == 0L) {
-                if (!ensureModel(appContext, sourceLanguage, baseUrl)) {
+                if (!ensureModel(appContext, sourceLanguage, baseUrl, jaModel)) {
                     return@withContext texts.map { null }
                 }
                 h = ensureHandle()
@@ -85,23 +88,43 @@ class OpusMtTranslator(
             "config.json", "model.bin", "shared_vocabulary.json", "source.spm", "target.spm",
         )
 
-        fun modelDir(context: Context, lang: String): File =
-            File(context.filesDir, "models/opus-mt-$lang-en")
+        /** Directory name for the model of [lang]; Japanese has two variants. */
+        fun modelDirName(lang: String, jaModel: String = OverlayConfig.JA_HPLT): String =
+            if (lang == OverlayConfig.LANG_JA && jaModel == OverlayConfig.JA_HPLT) {
+                "ja-hplt-en"
+            } else {
+                "opus-mt-$lang-en"
+            }
 
-        fun isReady(context: Context, lang: String): Boolean =
-            File(modelDir(context, lang), "ready").exists()
+        fun modelDir(
+            context: Context,
+            lang: String,
+            jaModel: String = OverlayConfig.JA_HPLT,
+        ): File = File(context.filesDir, "models/${modelDirName(lang, jaModel)}")
+
+        fun isReady(
+            context: Context,
+            lang: String,
+            jaModel: String = OverlayConfig.JA_HPLT,
+        ): Boolean = File(modelDir(context, lang, jaModel), "ready").exists()
 
         /**
          * Ensures the model for [lang] exists locally: extracts bundled assets
          * when present, otherwise downloads all files from [baseUrl]. Returns
          * true when the model is ready to use.
          */
-        suspend fun ensureModel(context: Context, lang: String, baseUrl: String): Boolean =
+        suspend fun ensureModel(
+            context: Context,
+            lang: String,
+            baseUrl: String,
+            jaModel: String = OverlayConfig.JA_HPLT,
+        ): Boolean =
             withContext(Dispatchers.IO) {
-                val dest = modelDir(context, lang)
+                val dirName = modelDirName(lang, jaModel)
+                val dest = modelDir(context, lang, jaModel)
                 if (File(dest, "ready").exists()) return@withContext true
 
-                val assetDir = "models/opus-mt-$lang-en"
+                val assetDir = "models/$dirName"
                 val names = runCatching { context.assets.list(assetDir) }.getOrNull()
                 if (!names.isNullOrEmpty()) {
                     dest.mkdirs()
@@ -111,16 +134,16 @@ class OpusMtTranslator(
                         }
                     }
                     File(dest, "ready").writeText("ok")
-                    Log.i(TAG, "Bundled model $lang-en extracted to $dest")
+                    Log.i(TAG, "Bundled model $dirName extracted to $dest")
                     return@withContext true
                 }
 
                 val base = baseUrl.trimEnd('/')
-                Log.i(TAG, "Downloading opus-mt-$lang-en from $base (one-time)…")
+                Log.i(TAG, "Downloading $dirName from $base (one-time)…")
                 return@withContext try {
                     dest.mkdirs()
                     for (name in FILES) {
-                        val conn = URL("$base/opus-mt-$lang-en/$name").openConnection() as HttpURLConnection
+                        val conn = URL("$base/$dirName/$name").openConnection() as HttpURLConnection
                         conn.connectTimeout = 15_000
                         conn.readTimeout = 180_000
                         val code = conn.responseCode
@@ -130,7 +153,7 @@ class OpusMtTranslator(
                         }
                     }
                     File(dest, "ready").writeText("ok")
-                    Log.i(TAG, "Model $lang-en ready in $dest")
+                    Log.i(TAG, "Model $dirName ready in $dest")
                     true
                 } catch (e: Exception) {
                     runCatching { dest.deleteRecursively() }

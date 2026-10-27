@@ -36,6 +36,8 @@ data class OverlayConfig(
     val audioEnabled: Boolean = false,
     /** "fast" (whisper tiny, default) or "accurate" (whisper base). */
     val audioQuality: String = AUDIO_FAST,
+    /** Japanese only: [JA_HPLT] (newer HPLT model, default) or [JA_OPUS] (Helsinki). */
+    val jaModel: String = JA_HPLT,
 ) {
     val captureIntervalMillis: Long
         get() = captureIntervalMs.toLong().coerceIn(MIN_INTERVAL_MS, MAX_INTERVAL_MS)
@@ -85,6 +87,10 @@ data class OverlayConfig(
 
         const val AUDIO_FAST = "fast"
         const val AUDIO_ACCURATE = "accurate"
+
+        const val KEY_JA_MODEL = "ja_model"
+        const val JA_OPUS = "ja_opus"
+        const val JA_HPLT = "ja_hplt"
 
         const val BACKEND_AUTO = "auto"
         const val BACKEND_OPUSMT = "opusmt"

@@ -226,6 +226,30 @@
                     android:entries="@array/backend_labels" />
 
                 <TextView
+                    android:id="@+id/jaModelLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_ja_model"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:visibility="gone" />
+
+                <Spinner
+                    android:id="@+id/jaModelSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:entries="@array/ja_model_labels"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_ja_model_desc"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <TextView
                     android:id="@+id/fpsLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
