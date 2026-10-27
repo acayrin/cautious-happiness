@@ -2,7 +2,6 @@ package com.overlaytranslator.translate
 
 import android.content.Context
 import android.util.Log
-import com.overlaytranslator.overlay.OverlayConfig
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -34,8 +33,6 @@ class OpusMtTranslator(
     context: Context,
     private val sourceLanguage: String,
     private val baseUrl: String,
-    /** Japanese only: ja-hplt-en (better on game lines) or the Helsinki pair. */
-    private val jaModel: String = OverlayConfig.JA_HPLT,
 ) : TextTranslator {
 
     private val appContext = context.applicationContext
@@ -47,7 +44,7 @@ class OpusMtTranslator(
 
     private fun ensureHandle(): Long {
         if (handle != 0L) return handle
-        val dir = modelDir(appContext, sourceLanguage, jaModel)
+        val dir = modelDir(appContext, sourceLanguage)
             .takeIf { File(it, "ready").exists() } ?: return 0L
         handle = OpusMtNative.nativeCreate(
             dir.absolutePath,
@@ -63,7 +60,7 @@ class OpusMtTranslator(
             if (texts.isEmpty()) return@withContext emptyList()
             var h = ensureHandle()
             if (h == 0L) {
-                if (!ensureModel(appContext, sourceLanguage, baseUrl, jaModel)) {
+                if (!ensureModel(appContext, sourceLanguage, baseUrl)) {
                     return@withContext texts.map { null }
                 }
                 h = ensureHandle()
@@ -88,25 +85,20 @@ class OpusMtTranslator(
             "config.json", "model.bin", "shared_vocabulary.json", "source.spm", "target.spm",
         )
 
-        /** Directory name for the model of [lang]; Japanese has two variants. */
-        fun modelDirName(lang: String, jaModel: String = OverlayConfig.JA_HPLT): String =
-            if (lang == OverlayConfig.LANG_JA && jaModel == OverlayConfig.JA_HPLT) {
-                "ja-hplt-en"
-            } else {
-                "opus-mt-$lang-en"
-            }
+        /**
+         * Languages with an HPLT model use it (`hplt-<lang>-en`); the rest keep
+         * the Helsinki OPUS-MT pair (`opus-mt-<lang>-en`).
+         */
+        private val HPLT_LANGS = setOf("ja", "ko", "vi", "hi")
 
-        fun modelDir(
-            context: Context,
-            lang: String,
-            jaModel: String = OverlayConfig.JA_HPLT,
-        ): File = File(context.filesDir, "models/${modelDirName(lang, jaModel)}")
+        fun modelDirName(lang: String): String =
+            if (lang in HPLT_LANGS) "hplt-$lang-en" else "opus-mt-$lang-en"
 
-        fun isReady(
-            context: Context,
-            lang: String,
-            jaModel: String = OverlayConfig.JA_HPLT,
-        ): Boolean = File(modelDir(context, lang, jaModel), "ready").exists()
+        fun modelDir(context: Context, lang: String): File =
+            File(context.filesDir, "models/${modelDirName(lang)}")
+
+        fun isReady(context: Context, lang: String): Boolean =
+            File(modelDir(context, lang), "ready").exists()
 
         /**
          * Ensures the model for [lang] exists locally: extracts bundled assets
@@ -117,11 +109,10 @@ class OpusMtTranslator(
             context: Context,
             lang: String,
             baseUrl: String,
-            jaModel: String = OverlayConfig.JA_HPLT,
         ): Boolean =
             withContext(Dispatchers.IO) {
-                val dirName = modelDirName(lang, jaModel)
-                val dest = modelDir(context, lang, jaModel)
+                val dirName = modelDirName(lang)
+                val dest = modelDir(context, lang)
                 if (File(dest, "ready").exists()) return@withContext true
 
                 val assetDir = "models/$dirName"

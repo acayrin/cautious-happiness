@@ -139,17 +139,6 @@
     <!-- Audio subtitles -->
     <string name="settings_audio">Audio subtitles</string>
     <string name="settings_audio_desc">Transcribe the captured app\'s audio (voice lines) and show the English translation as a subtitle. Secure apps and apps that block audio capture produce silence. Background music reduces accuracy. Applies when capture restarts.</string>
-    <string name="settings_ja_model">Japanese model</string>
-    <string name="settings_ja_model_desc">HPLT is a newer Japanese→English model that handles game lines better (e.g. level-up/HP text, honorific-length replies). Helsinki is the bundled default. Applies when capture restarts.</string>
-    <string-array name="ja_model_labels">
-        <item>HPLT (recommended)</item>
-        <item>Helsinki OPUS-MT (original)</item>
-    </string-array>
-    <string-array name="ja_model_codes">
-        <item>ja_hplt</item>
-        <item>ja_opus</item>
-    </string-array>
-
     <string name="settings_audio_quality">Transcription quality</string>
     <string name="settings_audio_quality_desc">Fast is the default (small model, lowest delay). Accurate is slower and downloads a bigger model. Applies when capture restarts.</string>
     <string-array name="audio_quality_labels">

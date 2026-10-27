@@ -74,8 +74,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var backendSpinner: android.widget.Spinner
     private lateinit var audioSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var audioQualitySpinner: android.widget.Spinner
-    private lateinit var jaModelLabel: android.widget.TextView
-    private lateinit var jaModelSpinner: android.widget.Spinner
 
     private var running = false
 
@@ -212,8 +210,6 @@ class MainActivity : AppCompatActivity() {
         backendSpinner = findViewById(R.id.backendSpinner)
         audioSwitch = findViewById(R.id.audioSwitch)
         audioQualitySpinner = findViewById(R.id.audioQualitySpinner)
-        jaModelLabel = findViewById(R.id.jaModelLabel)
-        jaModelSpinner = findViewById(R.id.jaModelSpinner)
     }
 
     private fun wireListeners() {
@@ -392,22 +388,6 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
-        jaModelSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: android.widget.AdapterView<*>?, view: android.view.View?,
-                position: Int, id: Long,
-            ) {
-                val code = resources.getStringArray(R.array.ja_model_codes)[position]
-                if (code != config.jaModel) {
-                    config = config.copy(jaModel = code)
-                    saveConfig()
-                    Toast.makeText(
-                        this@MainActivity, R.string.settings_backend_applies, Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-        }
         modelUrlInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun afterTextChanged(editable: android.text.Editable) {
                 val url = editable.toString().trim()
@@ -426,7 +406,6 @@ class MainActivity : AppCompatActivity() {
                 position: Int, id: Long,
             ) {
                 val code = resources.getStringArray(R.array.source_language_codes)[position]
-                refreshJaModelVisibility(code)
                 if (code != currentLang()) {
                     saveLang(code)
                     Toast.makeText(this@MainActivity, R.string.settings_language_applies, Toast.LENGTH_SHORT).show()
@@ -576,16 +555,6 @@ class MainActivity : AppCompatActivity() {
         audioSwitch.isChecked = config.audioEnabled
         val qualities = resources.getStringArray(R.array.audio_quality_codes)
         audioQualitySpinner.setSelection(qualities.indexOf(config.audioQuality).coerceAtLeast(0))
-        val jaModels = resources.getStringArray(R.array.ja_model_codes)
-        jaModelSpinner.setSelection(jaModels.indexOf(config.jaModel).coerceAtLeast(0))
-        refreshJaModelVisibility(currentLang())
-    }
-
-    /** The Japanese model choice only applies to Japanese sources. */
-    private fun refreshJaModelVisibility(lang: String) {
-        val visible = if (lang == OverlayConfig.LANG_JA) android.view.View.VISIBLE else android.view.View.GONE
-        jaModelLabel.visibility = visible
-        jaModelSpinner.visibility = visible
     }
 
     /** Resolves a theme color attribute (follows the Material You palette). */
@@ -665,7 +634,6 @@ class MainActivity : AppCompatActivity() {
             .putBoolean(OverlayConfig.KEY_NORMALIZE_CACHE, config.normalizeCacheKeys)
             .putBoolean(OverlayConfig.KEY_AUDIO_ENABLED, config.audioEnabled)
             .putString(OverlayConfig.KEY_AUDIO_QUALITY, config.audioQuality)
-            .putString(OverlayConfig.KEY_JA_MODEL, config.jaModel)
             .apply()
     }
 
