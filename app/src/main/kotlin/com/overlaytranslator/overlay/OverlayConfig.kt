@@ -67,8 +67,18 @@ data class OverlayConfig(
         const val KEY_NORMALIZE_CACHE = "normalize_cache"
         const val KEY_MODEL_URL = "model_base_url"
 
+        /** Models live on the `models` branch; `main` is app source only. */
         const val DEFAULT_MODEL_URL =
+            "https://raw.githubusercontent.com/acayrin/cautious-happiness/models"
+
+        /** Pre-split URL (models used to sit under `main/models`). Installs that
+         *  saved it would 404 after the history rewrite, so it reads as unset. */
+        const val LEGACY_MODEL_URL =
             "https://raw.githubusercontent.com/acayrin/cautious-happiness/main/models"
+
+        /** Stored model URL, with the dead pre-split value treated as unset. */
+        fun modelUrl(stored: String?): String =
+            stored?.takeIf { it.isNotBlank() && it != LEGACY_MODEL_URL } ?: DEFAULT_MODEL_URL
         const val KEY_BACKEND = "translation_backend"
         const val KEY_AUDIO_ENABLED = "audio_enabled"
         const val KEY_AUDIO_QUALITY = "audio_quality"

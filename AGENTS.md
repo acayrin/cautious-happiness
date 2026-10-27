@@ -46,11 +46,15 @@ statics into `deps/build-ct2` / `deps/build-spm` / `deps/build-whisper`, linked 
   `add_source_eos: true` in `config.json`, else the model degenerates into repetition.
 - **Bergamot**: removed on purpose (slow/unreliable on-device); leftover files are
   git-ignored — do not resurrect without a strong reason.
-- **OPUS-MT model hosting**: models are downloaded from the "Model base URL" setting,
-  default `https://raw.githubusercontent.com/acayrin/cautious-happiness/main/models`.
-  Whisper models live under `<base>/whisper/` (ggml-tiny-q5_1 = fast default,
-  ggml-base-q5_1 = accurate). `Helsinki-NLP/opus-mt-pt-en` doesn't exist — the pt
-  folder is the converted `opus-mt-ROMANCE-en` (covers pt; don't "fix" the naming).
+- **Model hosting**: binaries live on the **`models` branch**, not `main` — `main` is
+  app source only (its history was rewritten to drop the 1.3 GB of models; do not
+  re-commit `models/`, it is git-ignored). Default base URL:
+  `https://raw.githubusercontent.com/acayrin/cautious-happiness/models`, files fetched as
+  `<base>/opus-mt-<lang>-en/*` and `<base>/whisper/*` (ggml-tiny-q5_1 = fast default,
+  ggml-base-q5_1 = accurate). The pre-split URL `.../main/models` is dead;
+  `OverlayConfig.modelUrl()` maps it back to the default so old installs keep working.
+  `Helsinki-NLP/opus-mt-pt-en` doesn't exist — the pt folder is the converted
+  `opus-mt-ROMANCE-en` (covers pt; don't "fix" the naming).
 - **Audio subtitles**: AudioPlaybackCapture rides on the SAME MediaProjection consent
   (no RECORD_AUDIO, no extra VirtualDisplay). Apps with `allowAudioCapture=false` or
   FLAG_SECURE are silent. whisper.cpp runs greedy/2 threads (leave CPU for OPUS-MT);

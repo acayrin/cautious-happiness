@@ -187,9 +187,9 @@ class CaptureService : Service() {
             clearAfterSeconds = p.getInt(OverlayConfig.KEY_CLEAR_AFTER, 2),
             allowTextOverflow = p.getBoolean(OverlayConfig.KEY_TEXT_OVERFLOW, false),
             normalizeCacheKeys = p.getBoolean(OverlayConfig.KEY_NORMALIZE_CACHE, false),
-            modelBaseUrl = p.getString(
-                OverlayConfig.KEY_MODEL_URL, OverlayConfig.DEFAULT_MODEL_URL,
-            ) ?: OverlayConfig.DEFAULT_MODEL_URL,
+            modelBaseUrl = OverlayConfig.modelUrl(
+                p.getString(OverlayConfig.KEY_MODEL_URL, OverlayConfig.DEFAULT_MODEL_URL),
+            ),
             audioEnabled = p.getBoolean(OverlayConfig.KEY_AUDIO_ENABLED, false),
             audioQuality = p.getString(
                 OverlayConfig.KEY_AUDIO_QUALITY, OverlayConfig.AUDIO_FAST,

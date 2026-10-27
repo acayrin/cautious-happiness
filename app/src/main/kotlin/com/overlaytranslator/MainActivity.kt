@@ -205,7 +205,7 @@ class MainActivity : AppCompatActivity() {
         normalizeSwitch = findViewById(R.id.normalizeSwitch)
         cacheSizeText = findViewById(R.id.cacheSizeText)
         modelUrlInput = findViewById(R.id.modelUrlInput)
-        modelUrlInput.setText(config.modelBaseUrl)
+        modelUrlInput.setText(OverlayConfig.modelUrl(config.modelBaseUrl))
         languageSpinner = findViewById(R.id.languageSpinner)
         backendSpinner = findViewById(R.id.backendSpinner)
         audioSwitch = findViewById(R.id.audioSwitch)
@@ -776,7 +776,7 @@ class MainActivity : AppCompatActivity() {
         btn.isEnabled = false
         Toast.makeText(this, R.string.model_downloading, Toast.LENGTH_SHORT).show()
 
-        val url = modelUrlInput.text.toString().trim().ifBlank { OverlayConfig.DEFAULT_MODEL_URL }
+        val url = OverlayConfig.modelUrl(modelUrlInput.text.toString().trim())
         val lang = currentLang()
         lifecycleScope.launch {
             val ok = OpusMtTranslator.ensureModel(this@MainActivity, lang, url)

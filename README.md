@@ -55,12 +55,16 @@ by `build-deps.sh`; the vendored sources and prebuilt archives are git-ignored.
 
 ## Models
 
-Pre-converted OPUS-MT int8 models live in [`models/`](models) (one folder per pair:
-`opus-mt-<src>-en/` with `model.bin`, `config.json`, `shared_vocabulary.json`,
-`source.spm`, `target.spm`). The app downloads them from the **Model base URL**
-setting (default: this repo's raw URL) into app storage on first use.
+Model binaries live on the [`models`](../../tree/models) branch — this `main` branch is
+app source only (a fresh clone is a few hundred KB).
 
-`models/whisper/` holds the whisper.cpp ggml models for audio subtitles
+Pre-converted OPUS-MT int8 models sit in `opus-mt-<src>-en/` there (one folder per pair:
+`model.bin`, `config.json`, `shared_vocabulary.json`, `source.spm`, `target.spm`). The app
+downloads them from the **Model base URL** setting (default:
+`https://raw.githubusercontent.com/acayrin/cautious-happiness/models`) into app storage on
+first use.
+
+`whisper/` on that branch holds the whisper.cpp ggml models for audio subtitles
 (`ggml-tiny-q5_1.bin` fast, `ggml-base-q5_1.bin` accurate), downloaded the same way.
 Note: `Helsinki-NLP/opus-mt-pt-en` does not exist — the `opus-mt-pt-en/` folder is
 the multilingual `opus-mt-ROMANCE-en` model (covers Portuguese; Romance languages
