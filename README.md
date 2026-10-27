@@ -58,11 +58,12 @@ by `build-deps.sh`; the vendored sources and prebuilt archives are git-ignored.
 Model binaries live on the [`models`](../../tree/models) branch — this `main` branch is
 app source only (a fresh clone is a few hundred KB).
 
-Pre-converted OPUS-MT int8 models sit in `opus-mt-<src>-en/` there (one folder per pair:
-`model.bin`, `config.json`, `shared_vocabulary.json`, `source.spm`, `target.spm`). The app
-downloads them from the **Model base URL** setting (default:
-`https://raw.githubusercontent.com/acayrin/cautious-happiness/models`) into app storage on
-first use.
+Models sit in one folder per language (`model.bin`, `config.json`,
+`shared_vocabulary.json`, `source.spm`, `target.spm`): `hplt-<lang>-en/` for the languages
+HPLT v2.0 covers (ja, ko, vi, hi) and `opus-mt-<lang>-en/` for the rest — HPLT publishes no
+zh/fr/es/de/it/pt/nl/pl/sv/tr/id/cs model. The app downloads them from the **Model base URL**
+setting (default: `https://raw.githubusercontent.com/acayrin/cautious-happiness/models`) into
+app storage on first use.
 
 `whisper/` on that branch holds the whisper.cpp ggml models for audio subtitles
 (`ggml-tiny-q5_1.bin` fast, `ggml-base-q5_1.bin` accurate), downloaded the same way.
